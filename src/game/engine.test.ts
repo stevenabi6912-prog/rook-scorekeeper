@@ -4,6 +4,7 @@ import { botDiscard } from './bots'
 import { ROOK, type CardId } from './cards'
 import type { Deal } from './deal'
 import {
+  UNKNOWN,
   applyAction,
   canClaimRest,
   exposedNestCard,
@@ -42,7 +43,10 @@ function throughBidding(state: HandState, bidderSeat: number, bid: number | 'moo
     s = mustApply(s, { type: 'bid', seat, bid: seat === bidderSeat ? bid : 'pass' })
   }
   if (s.phase === 'overshoot') s = mustApply(s, { type: 'overshoot', seat: s.dealerSeat, accept: false })
-  if (s.phase === 'nest') s = mustApply(s, { type: 'discard', seat: bidderSeat, cards: kitty })
+  if (s.phase === 'nest') {
+    s = mustApply(s, { type: 'pickup', seat: bidderSeat })
+    s = mustApply(s, { type: 'discard', seat: bidderSeat, cards: kitty })
+  }
   expect(s.phase).toBe('trump')
   expect(s.bidderSeat).toBe(bidderSeat)
   return mustApply(s, { type: 'trump', seat: bidderSeat, trump })
@@ -235,9 +239,15 @@ describe('the Kitty exchange', () => {
   }
 
   it('the bidder picks up the whole Kitty and must lay the same number back down', () => {
-    const s = won()
+    let s = won()
     expect(s.phase).toBe('nest')
     expect(s.turnSeat).toBe(0)
+    expect(s.nestPickedUp).toBe(0)
+    expect(s.nest).toEqual(KITTY) // still on the table until picked up
+    expect(applyAction(s, { type: 'discard', seat: 0, cards: KITTY })).toMatchObject({ ok: false, error: /Pick up/ })
+    expect(applyAction(s, { type: 'pickup', seat: 1 }).ok).toBe(false)
+    s = mustApply(s, { type: 'pickup', seat: 0 })
+    expect(applyAction(s, { type: 'pickup', seat: 0 })).toMatchObject({ ok: false, error: /already/ })
     expect(s.hands[0]).toEqual(['R5', 'R6', 'G14', ...KITTY])
     expect(s.hands[1]).toHaveLength(3)
     expect(s.nest).toEqual([])
@@ -247,7 +257,7 @@ describe('the Kitty exchange', () => {
   })
 
   it('rejects bad lay-downs', () => {
-    const s = won()
+    const s = mustApply(won(), { type: 'pickup', seat: 0 })
     expect(applyAction(s, { type: 'discard', seat: 1, cards: ['R7', 'Y5', 'G5', 'R7', 'Y5'] }).ok).toBe(false)
     expect(applyAction(s, { type: 'discard', seat: 0, cards: ['R5', 'R6'] })).toMatchObject({ ok: false, error: /exactly 5/ })
     expect(applyAction(s, { type: 'discard', seat: 0, cards: ['R5', 'R5', 'R6', 'G14', 'Y10'] })).toMatchObject({ ok: false, error: /twice/ })
@@ -255,7 +265,7 @@ describe('the Kitty exchange', () => {
   })
 
   it('after laying down, the hand is back to size, the Kitty is face down, and trump is next', () => {
-    let s = won()
+    let s = mustApply(won(), { type: 'pickup', seat: 0 })
     s = mustApply(s, { type: 'discard', seat: 0, cards: ['B6', 'B7', 'B8', 'R5', 'Y10'] })
     expect(s.phase).toBe('trump')
     expect(s.hands[0]).toEqual(['R6', 'G14', ROOK])
@@ -287,6 +297,7 @@ describe('the Kitty exchange', () => {
     s = mustApply(s, bid(1, 'pass'))
     s = mustApply(s, bid(2, 'pass'))
     s = mustApply(s, bid(3, 'pass'))
+    s = mustApply(s, { type: 'pickup', seat: 0 })
     expect(applyAction(s, { type: 'discard', seat: 0, cards: ['B6', 'B7', 'B8', 'R5', 'R6'] })).toMatchObject({ ok: false, error: /Point cards/ })
     expect(applyAction(s, { type: 'discard', seat: 0, cards: ['B6', 'B7', 'B8', 'R6', ROOK] }).ok).toBe(false)
   })
@@ -435,7 +446,7 @@ describe('trick winner', () => {
 })
 
 describe('throwing the cards in', () => {
-  // Trump is green. Seat 0 holds the top trumps; nobody else has any trump.
+  // Trump is green. Seat 0 holds the Rook and the green 14: nothing unseen can top either.
   const unbeatable = () =>
     throughBidding(
       fixed([
@@ -449,7 +460,7 @@ describe('throwing the cards in', () => {
       'green',
     )
 
-  it('is allowed on lead when nothing left can beat any of your cards', () => {
+  it('is allowed on lead when nothing you have not seen can beat any of your cards', () => {
     const s = unbeatable()
     expect(canClaimRest(s, 0)).toBe(true)
     expect(canClaimRest(s, 1)).toBe(false) // not on lead
@@ -460,23 +471,29 @@ describe('throwing the cards in', () => {
     expect(done.tricks.every((t) => t.winnerSeat === 0)).toBe(true)
     expect(done.tricks[1].tookNest).toBe(true)
     expect(done.hands.flat()).toHaveLength(0)
-    // all the points left on the table: G14 10 + ROOK 20 + R14 10 + Y5 5 + B14 10
+    // every dealt point ends up counted: G14 10 + ROOK 20 + R14 10 + Y5 5 + B14 10
     expect(done.tricks.reduce((n, t) => n + t.points, 0)).toBe(55)
   })
 
-  it('is refused when an opponent still holds a higher trump, or you hold a beatable plain card', () => {
+  it('is decided from public information plus your own hand, so it works when other hands are hidden', () => {
+    const s = unbeatable()
+    const hidden = { ...s, hands: s.hands.map((h, i) => (i === 0 ? h : h.map(() => UNKNOWN))), nest: s.nest.map(() => UNKNOWN) }
+    expect(canClaimRest(hidden, 0)).toBe(true)
+    const done = mustApply(hidden, { type: 'claim', seat: 0 })
+    expect(done.phase).toBe('over')
+    // with other hands and the Kitty hidden, everything unaccounted for in the deck is the claimer's
+    expect(done.tricks.reduce((n, t) => n + t.points, 0)).toBe(120)
+    // only the claimer's cards are in the archive; the rest were never seen
+    expect(done.tricks.flatMap((t) => t.plays).every((p) => p.seat === 0)).toBe(true)
+  })
+
+  it('is refused while a higher trump, or any trump against a plain card, is still unseen', () => {
     const higherTrumpOut = throughBidding(fixed([['G13', 'R5'], ['G14', 'Y9'], ['Y5', 'B8'], ['R7', 'B14']]), 0, 80, 'green')
     expect(canClaimRest(higherTrumpOut, 0)).toBe(false)
     expect(applyAction(higherTrumpOut, { type: 'claim', seat: 0 })).toMatchObject({ ok: false, error: /still take/ })
-
-    const plainBeatable = throughBidding(fixed([['R13', 'R12'], ['R14', 'Y9'], ['Y5', 'B8'], ['R7', 'B14']]), 0, 80, 'green')
-    expect(canClaimRest(plainBeatable, 0)).toBe(false)
-
-    // High plain cards are fine only when nobody has trump left to ruff them.
-    const plainSafe = throughBidding(fixed([['R14', 'B14'], ['R13', 'Y9'], ['Y5', 'B8'], ['R7', 'B13']]), 0, 80, 'green')
-    expect(canClaimRest(plainSafe, 0)).toBe(true)
-    const ruffable = throughBidding(fixed([['R14', 'B14'], ['R13', 'G5'], ['Y5', 'B8'], ['R7', 'B13']]), 0, 80, 'green')
-    expect(canClaimRest(ruffable, 0)).toBe(false)
+    // A top plain card is never safe while any trump is unaccounted for.
+    const plain = throughBidding(fixed([['R14', 'B14'], ['R13', 'Y9'], ['Y5', 'B8'], ['R7', 'B13']]), 0, 80, 'green')
+    expect(canClaimRest(plain, 0)).toBe(false)
   })
 
   it('cannot be used mid-trick', () => {
@@ -487,8 +504,8 @@ describe('throwing the cards in', () => {
   })
 
   it('makes a Moon when the claimer\'s team already had every trick', () => {
-    let s = throughBidding(fixed([['G14', ROOK, 'G5'], ['R14', 'Y9', 'Y6'], ['Y5', 'B8', 'B9'], ['R7', 'B14', 'R8']]), 0, 'moon', 'green')
-    s = mustApply(s, play(0, 'G5'))
+    let s = throughBidding(fixed([['G14', ROOK, 'G13'], ['R14', 'Y9', 'Y6'], ['Y5', 'B8', 'B9'], ['R7', 'B14', 'R8']]), 0, 'moon', 'green')
+    s = mustApply(s, play(0, 'G13'))
     s = mustApply(s, play(1, 'Y6'))
     s = mustApply(s, play(2, 'B9'))
     s = mustApply(s, play(3, 'R8'))
@@ -496,8 +513,8 @@ describe('throwing the cards in', () => {
     expect(canClaimRest(s, 0)).toBe(true)
     const done = mustApply(s, { type: 'claim', seat: 0 })
     expect(done.tricks.every((t) => t.winnerSeat === 0)).toBe(true)
-    // G14 10 + ROOK 20 + G5 5 + R14 10 + Y5 5 + B14 10
-    expect(done.tricks.reduce((n, t) => n + t.points, 0)).toBe(60)
+    // G14 10 + ROOK 20 + R14 10 + Y5 5 + B14 10
+    expect(done.tricks.reduce((n, t) => n + t.points, 0)).toBe(55)
   })
 })
 
@@ -575,7 +592,10 @@ describe('playing a hand', () => {
         const options = legalBids(s, s.turnSeat)
         s = mustApply(s, bid(s.turnSeat, options[Math.floor(rng() * options.length)]))
       }
-      if (s.phase === 'nest') s = mustApply(s, { type: 'discard', seat: s.bidderSeat!, cards: botDiscard(s, s.bidderSeat!) })
+      if (s.phase === 'nest') {
+        s = mustApply(s, { type: 'pickup', seat: s.bidderSeat! })
+        s = mustApply(s, { type: 'discard', seat: s.bidderSeat!, cards: botDiscard(s, s.bidderSeat!) })
+      }
       s = mustApply(s, { type: 'trump', seat: s.bidderSeat!, trump: 'red' })
       const tricks = totalTricks(s)
       while (s.phase === 'playing') {

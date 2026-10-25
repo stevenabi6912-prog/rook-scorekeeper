@@ -15,7 +15,10 @@ function playOut(hands: CardId[][], nest: CardId[], bid: number | 'moon', plays:
   s = mustApply(s, { type: 'bid', seat: 0, bid })
   if (s.phase === 'overshoot') s = mustApply(s, { type: 'overshoot', seat: 3, accept: false })
   for (const seat of [1, 2, 3]) if (s.phase === 'bidding') s = mustApply(s, { type: 'bid', seat, bid: 'pass' })
-  if (s.phase === 'nest') s = mustApply(s, { type: 'discard', seat: 0, cards: nest }) // lay the Kitty straight back
+  if (s.phase === 'nest') {
+    s = mustApply(s, { type: 'pickup', seat: 0 })
+    s = mustApply(s, { type: 'discard', seat: 0, cards: nest }) // lay the Kitty straight back
+  }
   s = mustApply(s, { type: 'trump', seat: 0, trump: 'green' })
   for (const [seat, card] of plays) s = mustApply(s, { type: 'play', seat, card })
   return s
@@ -110,6 +113,7 @@ describe('scoring a finished hand', () => {
     let s = startHandFromDeal({ rules: FAMILY_RULES, handedness: 4, teams: TEAMS, dealerSeat: 3 }, { hands, nest: NEST })
     s = mustApply(s, { type: 'bid', seat: 0, bid: 'moon' })
     s = mustApply(s, { type: 'overshoot', seat: 3, accept: false })
+    s = mustApply(s, { type: 'pickup', seat: 0 })
     s = mustApply(s, { type: 'discard', seat: 0, cards: NEST })
     s = mustApply(s, { type: 'trump', seat: 0, trump: 'green' })
     expect(moonStillPossible(s)).toBe(true)
@@ -125,6 +129,7 @@ describe('scoring a finished hand', () => {
     s = mustApply(s, { type: 'bid', seat: 0, bid: 'moon' })
     s = mustApply(s, { type: 'overshoot', seat: 3, accept: true })
     expect(s.bidderSeat).toBe(3)
+    s = mustApply(s, { type: 'pickup', seat: 3 })
     s = mustApply(s, { type: 'discard', seat: 3, cards: NEST })
     s = mustApply(s, { type: 'trump', seat: 3, trump: 'green' })
     for (const [seat, card] of [[3, 'G14'], [0, 'G5'], [1, 'G6'], [2, 'G7'], [3, 'R7'], [0, 'R10'], [1, 'R14'], [2, 'R5']] as [number, CardId][]) {

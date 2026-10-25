@@ -1,5 +1,5 @@
 import type { Handedness, TeamId } from '../lib/types'
-import { ROOK, cardPoints, effectiveSuit, pointsIn, strength, type CardId } from './cards'
+import { ROOK, buildDeck, cardPoints, deckPoints, effectiveSuit, pointsIn, strength, type CardId } from './cards'
 import { deal, type Deal } from './deal'
 import type { Rules, Suit } from './rules'
 
@@ -9,7 +9,16 @@ import type { Rules, Suit } from './rules'
  * transaction that commits a move, and in the tests.
  *
  *   bidding -> (overshoot) -> (nest: bidder picks up the Kitty and lays cards down) -> trump -> playing -> over
+ *
+ * Online, a phone only knows its own cards. Other seats' cards are UNKNOWN
+ * placeholders; every rule below is written so a move needs only public
+ * information plus the mover's own hand (the Kitty's points on the last trick
+ * are what is left of the deck's 120 once every played card is counted).
  */
+
+/** Placeholder for a card another player holds. Never parsed. */
+export const UNKNOWN: CardId = '?'
+export const isUnknown = (c: CardId): boolean => c === UNKNOWN
 
 export type Bid = number | 'moon'
 export type BidAction = Bid | 'pass'
@@ -55,7 +64,7 @@ export interface HandState {
   /** The Kitty. Dealt face down (top card face up under nestTopExposed); empty while the
    *  bidder holds it; then the cards the bidder laid down, face down, until the last trick. */
   nest: CardId[]
-  /** How many cards the bidder picked up and must lay back down (0 when nobody takes the nest). */
+  /** How many cards the bidder picked up and must lay back down (0 until picked up, or when nobody takes the nest). */
   nestPickedUp: number
   /** Seat dealt the Rook, or null when it was in the Kitty (recorded as "Kitty" for the stats). */
   rookHolderSeat: number | null
@@ -77,6 +86,8 @@ export interface HandState {
 export type Action =
   | { type: 'bid'; seat: number; bid: BidAction }
   | { type: 'overshoot'; seat: number; accept: boolean }
+  /** The bidder takes the Kitty into their hand (the first half of the nest phase). */
+  | { type: 'pickup'; seat: number }
   | { type: 'discard'; seat: number; cards: CardId[] }
   | { type: 'trump'; seat: number; trump: Suit }
   | { type: 'play'; seat: number; card: CardId }
@@ -238,23 +249,31 @@ function closeBidding(state: HandState, bidderSeat: number, bid: Bid, overshot =
     turnSeat: bidderSeat,
     trick: { leadSeat: bidderSeat, plays: [] },
   }
-  // The bidder picks up the Kitty and must lay the same number of cards back down.
+  // The bidder picks up the Kitty next, then lays the same number of cards back down.
   if (state.rules.bidderTakesNest && state.nest.length > 0) {
     next.phase = 'nest'
-    next.hands = state.hands.map((h, i) => (i === bidderSeat ? [...h, ...state.nest] : h))
-    next.nest = []
-    next.nestPickedUp = state.nest.length
-    // A Rook that came up in the Kitty is credited to the Kitty, not the bidder (Steven's rule).
+    next.nestPickedUp = 0
   }
   return next
 }
 
 /* --------------------------------------------------------------------- nest */
 
+function applyPickup(state: HandState, seat: number): Result {
+  if (state.phase !== 'nest') return fail('The Kitty is not being exchanged now.')
+  if (seat !== state.bidderSeat) return fail('Only the bidder picks up the Kitty.')
+  if (state.nestPickedUp > 0) return fail('The Kitty has already been picked up.')
+  if (state.nest.some(isUnknown)) return fail('The Kitty cards are not available to you.')
+  const hands = state.hands.map((h, i) => (i === seat ? [...h, ...state.nest] : h))
+  // A Rook that came up in the Kitty stays credited to the Kitty, not the bidder (Steven's rule).
+  return succeed({ ...state, hands, nest: [], nestPickedUp: state.nest.length })
+}
+
 /** Why `cards` cannot be laid down by `seat` right now, or null if they can. */
 export function discardProblem(state: HandState, seat: number, cards: CardId[]): string | null {
   if (state.phase !== 'nest') return 'The Kitty is not being exchanged now.'
   if (seat !== state.bidderSeat) return 'Only the bidder exchanges with the Kitty.'
+  if (state.nestPickedUp === 0) return 'Pick up the Kitty first.'
   if (cards.length !== state.nestPickedUp) return `Lay down exactly ${state.nestPickedUp} cards.`
   if (new Set(cards).size !== cards.length) return 'A card is listed twice.'
   const hand = state.hands[seat]
@@ -343,7 +362,8 @@ function applyPlay(state: HandState, seat: number, card: CardId): Result {
   const winnerSeat = trickWinner(trick, trump!, rules)
   const lastTrick = hands.every((h) => h.length === 0)
   const tookNest = lastTrick && rules.nestToLastTrick
-  const points = pointsIn(trick.plays.map((p) => p.card), rules) + (tookNest ? pointsIn(state.nest, rules) : 0)
+  const inTrick = pointsIn(trick.plays.map((p) => p.card), rules)
+  const points = inTrick + (tookNest ? nestPoints(state, inTrick) : 0)
   const tricks = [...state.tricks, { ...trick, winnerSeat, points, tookNest }]
 
   const moonBroken =
@@ -355,33 +375,68 @@ function applyPlay(state: HandState, seat: number, card: CardId): Result {
   return succeed({ ...state, hands, tricks, trick: { leadSeat: winnerSeat, plays: [] }, turnSeat: winnerSeat })
 }
 
+/**
+ * Points in the Kitty. When the Kitty is hidden (online, after the bidder
+ * laid it down) it is whatever is left of the deck's total once every played
+ * card is counted, so nobody needs to see it to score the last trick.
+ * `alsoPlayed` are points in cards played but not yet in `state.tricks`.
+ */
+function nestPoints(state: HandState, alsoPlayed = 0): number {
+  const { rules } = state
+  if (!state.nest.some(isUnknown)) return pointsIn(state.nest, rules)
+  const played = state.tricks.reduce((n, t) => n + pointsIn(t.plays.map((p) => p.card), rules), 0)
+  const inHands = state.hands.reduce((n, h) => n + pointsIn(h.filter((c) => !isUnknown(c)), rules), 0)
+  return deckPoints(rules) - played - alsoPlayed - inHands
+}
+
 /* -------------------------------------------------------------------- claim */
 
 /**
- * Can `seat` throw the cards in? Only when they are on lead and every card
- * they hold would win if led: a trump that no other player can top (the
- * Rook counts as a trump), or a plain card of a color nobody else can top
- * while nobody else holds any trump. Every remaining trick is then theirs
- * whatever anyone does. This is a sufficient test, not a complete one; a
- * hand that needs a particular order of leads is not claimable.
+ * Every card `seat` has not seen: the deck minus played cards, minus their
+ * own hand, minus the Kitty when they know it (the bidder laid it down). Any
+ * of these could be in an opponent's hand, so a claim must beat them all.
+ */
+export function unseenCards(state: HandState, seat: number): CardId[] {
+  const known = new Set<CardId>(state.hands[seat])
+  for (const t of state.tricks) for (const p of t.plays) known.add(p.card)
+  for (const p of state.trick.plays) known.add(p.card)
+  if (!state.nest.some(isUnknown)) for (const c of state.nest) known.add(c)
+  return buildDeck(state.rules).filter((c) => !known.has(c))
+}
+
+/**
+ * Could a hand holding `holder` beat any of `cards` when each is led?
+ * The Rook counts as a trump.
+ */
+export function canBeatAny(cards: CardId[], holder: CardId[], trump: Suit, rules: Rules): boolean {
+  const held = holder.filter((c) => !isUnknown(c))
+  const heldTrump = held.filter((c) => effectiveSuit(c, trump) === trump)
+  const top = (list: CardId[]) => list.reduce((m, c) => Math.max(m, strength(c, rules)), -Infinity)
+  return cards.some((card) => {
+    const suit = effectiveSuit(card, trump)
+    const mine = strength(card, rules)
+    if (suit === trump) return top(heldTrump) > mine
+    if (heldTrump.length > 0) return true
+    return top(held.filter((c) => effectiveSuit(c, trump) === suit)) > mine
+  })
+}
+
+/**
+ * Can `seat` throw the cards in? Only when they are on lead and no card
+ * they have not seen could beat any card they hold when led: their trumps
+ * are higher than every unseen trump (the Rook counts), and any plain card
+ * is safe only once every trump is accounted for and nothing unseen of its
+ * color is higher. Uses public information and the claimer's own hand only,
+ * so a phone can decide it alone. It is a sufficient test, not a complete
+ * one; a hand that needs a particular order of leads is not claimable.
  */
 export function canClaimRest(state: HandState, seat: number): boolean {
   if (state.phase !== 'playing' || state.turnSeat !== seat || state.trick.plays.length > 0) return false
   const trump = state.trump
   if (!trump) return false
   const mine = state.hands[seat]
-  if (mine.length === 0) return false
-  const others = state.hands.flatMap((h, i) => (i === seat ? [] : h))
-  const othersTrump = others.filter((c) => effectiveSuit(c, trump) === trump)
-  const top = (cards: CardId[]) => cards.reduce((m, c) => Math.max(m, strength(c, state.rules)), -Infinity)
-  const bestOtherTrump = top(othersTrump)
-  return mine.every((card) => {
-    const suit = effectiveSuit(card, trump)
-    const mine = strength(card, state.rules)
-    if (suit === trump) return mine > bestOtherTrump
-    if (othersTrump.length > 0) return false
-    return mine > top(others.filter((c) => effectiveSuit(c, trump) === suit))
-  })
+  if (mine.length === 0 || mine.some(isUnknown)) return false
+  return !canBeatAny(mine, unseenCards(state, seat), trump, state.rules)
 }
 
 function applyClaim(state: HandState, seat: number): Result {
@@ -392,19 +447,29 @@ function applyClaim(state: HandState, seat: number): Result {
   const hands = state.hands.map((h) => [...h])
   const tricks = [...state.tricks]
   const remaining = hands[seat].length
-  // Record the rest as tricks won by the claimer, strongest lead first, so the
-  // archive is complete and every point is accounted for.
+  // Points nobody can see from here: hidden hands and a hidden Kitty. They all
+  // belong to the claimer and land on the last trick.
+  const hidden =
+    deckPoints(rules) -
+    tricks.reduce((n, t) => n + pointsIn(t.plays.map((p) => p.card), rules), 0) -
+    state.hands.reduce((n, h) => n + pointsIn(h.filter((c) => !isUnknown(c)), rules), 0) -
+    (state.nest.some(isUnknown) ? 0 : pointsIn(state.nest, rules))
+  const everythingKnown = !state.nest.some(isUnknown) && state.hands.every((h) => !h.some(isUnknown))
+  // Record the rest as tricks won by the claimer, strongest lead first. Other
+  // players' cards are included when known (practice table) and left out when
+  // not (online).
   hands[seat].sort((a, b) => strength(b, rules) - strength(a, rules))
   for (let t = 0; t < remaining; t++) {
     const plays: Play[] = []
     for (let i = 0; i < handedness; i++) {
       const s = (seat + i) % handedness
       const card = hands[s].shift()
-      if (card) plays.push({ seat: s, card })
+      if (card && !isUnknown(card)) plays.push({ seat: s, card })
     }
     const last = t === remaining - 1
     const tookNest = last && rules.nestToLastTrick
-    const points = pointsIn(plays.map((p) => p.card), rules) + (tookNest ? pointsIn(state.nest, rules) : 0)
+    let points = pointsIn(plays.map((p) => p.card), rules)
+    if (last) points += (tookNest && everythingKnown ? pointsIn(state.nest, rules) : 0) + (everythingKnown ? 0 : hidden)
     tricks.push({ leadSeat: seat, plays, winnerSeat: seat, points, tookNest })
   }
   return succeed({ ...state, hands, tricks, trick: { leadSeat: seat, plays: [] }, phase: 'over', turnSeat: seat, claimedBySeat: seat })
@@ -418,6 +483,8 @@ export function applyAction(state: HandState, action: Action): Result {
       return applyBid(state, action.seat, action.bid)
     case 'overshoot':
       return applyOvershoot(state, action.seat, action.accept)
+    case 'pickup':
+      return applyPickup(state, action.seat)
     case 'discard':
       return applyDiscard(state, action.seat, action.cards)
     case 'trump':

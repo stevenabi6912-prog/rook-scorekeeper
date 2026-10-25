@@ -161,7 +161,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     const timer = setTimeout(() => {
       if (state.phase === 'bidding') act({ type: 'bid', seat, bid: botBid(state, seat, rng) })
       else if (state.phase === 'overshoot') act({ type: 'overshoot', seat, accept: rng() < 0.15 })
-      else if (state.phase === 'nest') act({ type: 'discard', seat, cards: botDiscard(state, seat) })
+      else if (state.phase === 'nest') act(state.nestPickedUp === 0 ? { type: 'pickup', seat } : { type: 'discard', seat, cards: botDiscard(state, seat) })
       else if (state.phase === 'trump') act({ type: 'trump', seat, trump: botTrump(state, seat) })
       else if (state.phase === 'playing') {
         // A bot that cannot lose another trick throws the cards in rather than playing it out.
@@ -190,7 +190,14 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
 
   const myTurn = !busy && !AUTOPILOT && state.turnSeat === ME && state.phase !== 'over'
 
-  // 30-second clock on my decisions; when it runs out the bot logic picks for me.
+  // The Kitty comes into my hand as soon as I win the bid.
+  useEffect(() => {
+    if (!busy && !AUTOPILOT && state.phase === 'nest' && state.turnSeat === ME && state.nestPickedUp === 0) {
+      act({ type: 'pickup', seat: ME })
+    }
+  }, [state, busy, act, AUTOPILOT])
+
+  // Clock on my decisions; when it runs out the bot logic picks for me.
   const decisionKey = `${state.phase}:${state.tricks.length}:${state.trick.plays.length}:${state.bidding.calls.length}`
   useEffect(() => {
     if (!myTurn) {
@@ -206,7 +213,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
       setToast('Time ran out. The table played for you.')
       if (s.phase === 'bidding') act({ type: 'bid', seat: ME, bid: botBid(s, ME, rng) })
       else if (s.phase === 'overshoot') act({ type: 'overshoot', seat: ME, accept: false })
-      else if (s.phase === 'nest') act({ type: 'discard', seat: ME, cards: botDiscard(s, ME) })
+      else if (s.phase === 'nest') act(s.nestPickedUp === 0 ? { type: 'pickup', seat: ME } : { type: 'discard', seat: ME, cards: botDiscard(s, ME) })
       else if (s.phase === 'trump') act({ type: 'trump', seat: ME, trump: botTrump(s, ME) })
       else if (s.phase === 'playing') act({ type: 'play', seat: ME, card: botPlay(s, ME, rng) })
     }, TURN_LIMIT_MS)
