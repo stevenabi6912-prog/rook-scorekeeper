@@ -1,4 +1,4 @@
-import { otherTeam, type HandInput, type TeamId } from '../lib/types'
+import { ROOK_IN_KITTY, otherTeam, type HandInput, type TeamId } from '../lib/types'
 import type { HandState } from './engine'
 
 export interface HandResult {
@@ -75,7 +75,7 @@ export function toHandInput(state: HandState, seatPlayerIds: string[]): HandInpu
     // For a made Moon the scorekeeper expects 120; every trick taken means
     // every point taken, so this is already the deck total.
     pointsTaken: r.pointsByTeam[r.bidTeam],
-    rookHolderId: state.rookHolderSeat === null ? null : seatPlayerIds[state.rookHolderSeat],
+    rookHolderId: state.rookHolderSeat === null ? ROOK_IN_KITTY : seatPlayerIds[state.rookHolderSeat],
     trump: state.trump,
   }
   if (r.bid === 'moon') input.moonMade = r.moonMade

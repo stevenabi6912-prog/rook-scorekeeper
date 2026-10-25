@@ -55,7 +55,7 @@ function tableConfig(handedness: Handedness, autopilot: boolean): TableConfig {
 
 const BOT_DELAY = 750
 /** A person gets this long per decision; then the table picks for them. */
-const TURN_LIMIT_MS = 30_000
+const TURN_LIMIT_MS = 60_000
 const REST_MS = 900
 const SWEEP_MS = 450
 

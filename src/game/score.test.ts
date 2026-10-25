@@ -51,7 +51,7 @@ describe('scoring a finished hand', () => {
       bidTeam: 'A',
       bid: 65,
       pointsTaken: 15,
-      rookHolderId: 'p-steven', // the Rook was in the Kitty, and the bidder picked it up
+      rookHolderId: 'kitty', // the Rook was in the Kitty: recorded as Kitty, not the bidder
       trump: 'green',
     })
     expect(input.moonMade).toBeUndefined()

@@ -54,8 +54,7 @@ export const FAMILY_RULES: Rules = {
   points: { 5: 5, 10: 10, 14: 10 },
   nestSize: 5,
   bidderTakesNest: true,
-  // Open question for Steven: may point cards be laid down? Default yes.
-  discardPointsAllowed: true,
+  discardPointsAllowed: true, // anything may be laid down, Rook included (Steven)
   nestToLastTrick: true,
   nestTopExposed: true,
   rookOnlyWhenVoid: true,

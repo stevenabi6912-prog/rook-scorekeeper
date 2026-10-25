@@ -57,7 +57,7 @@ export interface HandState {
   nest: CardId[]
   /** How many cards the bidder picked up and must lay back down (0 when nobody takes the nest). */
   nestPickedUp: number
-  /** Seat dealt the Rook, or null when it is in the nest. */
+  /** Seat dealt the Rook, or null when it was in the Kitty (recorded as "Kitty" for the stats). */
   rookHolderSeat: number | null
   phase: Phase
   bidding: BiddingState
@@ -239,7 +239,7 @@ function closeBidding(state: HandState, bidderSeat: number, bid: Bid, overshot =
     next.hands = state.hands.map((h, i) => (i === bidderSeat ? [...h, ...state.nest] : h))
     next.nest = []
     next.nestPickedUp = state.nest.length
-    if (state.nest.includes(ROOK)) next.rookHolderSeat = bidderSeat
+    // A Rook that came up in the Kitty is credited to the Kitty, not the bidder (Steven's rule).
   }
   return next
 }

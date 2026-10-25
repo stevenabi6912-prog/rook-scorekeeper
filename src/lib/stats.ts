@@ -1,5 +1,6 @@
 import { replayHands } from './scoring'
 import type { Game, Hand, Player, TeamId } from './types'
+import { ROOK_IN_KITTY } from './types'
 
 export interface PlayerStats {
   playerId: string
@@ -72,7 +73,7 @@ export function computePlayerStats(
         s.bidSum += hand.bid
         if (outcome.made) s.bidsMade++
       }
-      if (hand.rookHolderId) get(hand.rookHolderId).rookHeld++
+      if (hand.rookHolderId && hand.rookHolderId !== ROOK_IN_KITTY) get(hand.rookHolderId).rookHeld++
     }
   }
 

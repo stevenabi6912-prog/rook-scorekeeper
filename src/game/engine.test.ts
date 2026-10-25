@@ -241,7 +241,7 @@ describe('the Kitty exchange', () => {
     expect(s.hands[1]).toHaveLength(3)
     expect(s.nest).toEqual([])
     expect(s.nestPickedUp).toBe(5)
-    expect(s.rookHolderSeat).toBe(0) // the Rook came up in the Kitty
+    expect(s.rookHolderSeat).toBeNull() // the Rook came up in the Kitty: credited to the Kitty, not the bidder
     expect(applyAction(s, { type: 'trump', seat: 0, trump: 'red' }).ok).toBe(false)
   })
 

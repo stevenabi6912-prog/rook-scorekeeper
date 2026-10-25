@@ -188,7 +188,7 @@ each maps to a field in `src/game/rules.ts`.
 | 7 | Must follow suit if able; the Rook may only be played when void in the led color or when trump is led. | `rookOnlyWhenVoid: true` |
 | 8 | Rook led counts as a trump lead; others must play trump if able. | built in |
 | 9 | Nest is 5 cards, 4- or 6-handed. | `nestSize: 5` |
-| 10, 11, 12 | **Corrected by Steven later the same day:** the winning bidder **picks up all 5 Kitty cards**, then lays any 5 cards from their hand face down as the new Kitty. That face-down pile goes to the team that wins the last trick. **The top card of the Kitty is dealt face up** so everyone sees it while bidding; it goes into the bidder's hand with the rest. **Open question:** may point cards (or the Rook) be laid down? Engine default: yes, anything may be laid down. | `bidderTakesNest: true`, `discardPointsAllowed: true`, `nestToLastTrick: true`, `nestTopExposed: true`, phase `nest` |
+| 10, 11, 12 | **Corrected by Steven later the same day:** the winning bidder **picks up all 5 Kitty cards**, then lays any 5 cards from their hand face down as the new Kitty. That face-down pile goes to the team that wins the last trick. **The top card of the Kitty is dealt face up** so everyone sees it while bidding; it goes into the bidder's hand with the rest. **Any cards may be laid down**, point cards and the Rook included (confirmed). | `bidderTakesNest: true`, `discardPointsAllowed: true`, `nestToLastTrick: true`, `nestTopExposed: true`, phase `nest` |
 | 13–17 | Bidding starts left of dealer, clockwise; a pass is final; if everyone passes the dealer takes it at 65; dealer bids in turn. **Jump bids are allowed**: the opening bid can be any multiple of 5 from 65 up (80, say) and any later bid can jump by more than 5 (80 to 90, or 80 to 120). | `legalBids` |
 | 17b | **Moon may only be a player's first call.** Once you have bid a number you cannot shoot later in the auction. (Steven, 2026-10-25.) | `moonOnlyAsFirstBid: true` |
 | 18 | **Moon means the bidding team must take every trick.** | `moonRequiresAllTricks: true` |
@@ -199,7 +199,7 @@ each maps to a field in `src/game/rules.ts`.
 | 23 | Bidder leads the first trick. | built in |
 | 24, 25 | Must follow the led color; if void, anything. Highest trump wins, else highest of the led color. | `trick.ts` |
 | 26 | No last-trick bonus beyond the nest. | built in |
-| 28 | Rook holder recorded as the player dealt the Rook; null if it was in the nest. | `rookHolderSeat` |
+| 28 | Rook holder recorded as the player dealt the Rook. If the Rook came up in the Kitty it is recorded as **"Kitty"**, not the bidder who picked it up (Steven). History shows "Rook: Kitty", stats credit nobody, and the manual hand form gets a Kitty chip too. | `rookHolderSeat`, `ROOK_IN_KITTY` |
 | 29 | **Overshoot (confirmed):** when someone bids Moon, the dealer may (not must) "over shoot" and take the Moon themselves. Scored exactly like a normal Moon; the first shooter cannot respond; the auction ends. Because a Moon must be a first call (17b) and the dealer calls last in the first round, the dealer has never bid or passed when the offer comes, so the "dealer already passed" case cannot arise under these rules. If the dealer shoots, nobody can overshoot. | `dealerMayOvershoot: true` |
 | 30 | Steven sent photos of the family deck: the classic Parker Brothers / Hasbro Rook deck. White faces; a big numeral top-left in the card's color with the color name printed vertically beside it ("RED", "BLACK", "GREEN", "YELLOW"); a small square badge with the point value under the numeral on point cards; a large numeral in the center inside a thin square frame; the whole index repeated upside down bottom-right. Green is a blue-green, yellow is golden. The Rook card is a drawn bird with "ROOK" vertical and a big "20". Backs are light blue with a scribbled texture and the ROOK logo. The `Card` component reproduces this layout; the back uses the same blue texture with the family's raven instead of the trademarked logo. | `Card.tsx` |
 | 31 | Sound style: default stands (realistic card sounds, a few short musical cues for bids, trump, Moon, your turn). | `sound.ts` |
@@ -614,18 +614,18 @@ it stays as a practice mode afterwards.
 - **Phone dies mid-move:** nothing is lost; the match doc is the only truth.
   The only client-side follow-up write is the scorekeeper hand (3.6), which
   is retried by whoever loads next.
-- **Timeouts (30 seconds per decision, Steven's rule):** every decision a
-  person has to make (bid, overshoot, trump, play) gets a visible 30-second
-  clock. When it runs out, that player's own phone picks for them using the
+- **Timeouts (one minute per decision, Steven's rule):** every decision a
+  person has to make (bid, overshoot, lay-down, trump, play) gets a visible
+  60-second clock. When it runs out, that player's own phone picks for them using the
   bot logic (the best legal card by the same heuristics the bots use) and
   commits the move, with a note that the table played for them. The
   practice table already does this.
   If their phone is closed or offline it cannot move for them, so the match
   doc records `turnStartedAt` on every move and the rules let **any seated
   player** read the stalled seat's cards and play for it once
-  `request.time` is more than 30 seconds past `turnStartedAt`. The host's
+  `request.time` is more than 60 seconds past `turnStartedAt`. The host's
   phone does this automatically (it already moves the bots), so a game never
-  waits on an absent person for more than about half a minute. Everyone sees
+  waits on an absent person for more than about a minute. Everyone sees
   "The table played for June". The seat keeps its uid; when the person
   comes back they simply continue.
 - **Abandon:** the host can end a match; the linked game stays with whatever
