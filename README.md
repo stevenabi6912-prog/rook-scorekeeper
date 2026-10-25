@@ -7,14 +7,15 @@ Firebase Firestore as the realtime database.
 
 - 4-handed (2 v 2) and 6-handed (3 v 3) games
 - Seat order, automatic dealer rotation with manual override
-- Bids 50–120 and **Moon**, with the correct "jump to the next 500" moon scoring
+- Trump for the current hand shown on every phone, and recorded per hand
+- Bids 65–120 and **Moon**, with the correct "jump to the next 500" moon scoring
 - Live preview of the result before you save a hand
 - Edit or delete any hand; every total after it is recomputed by replaying the game
 - Game history and per-player stats
 - Installable to the home screen (PWA), works offline and syncs when back online
 
 Rules are fixed: 120 points per hand, play to 500, bids in steps of 5 with a
-minimum of 50.
+minimum of 65.
 
 ---
 
@@ -208,11 +209,12 @@ families/{passcode}/players/{playerId}
 
 families/{passcode}/games/{gameId}
   handedness (4|6), teams { A: {name, playerIds}, B: {...} }, seatOrder[],
-  firstDealerId, status ('active'|'finished'), winner?, createdAt, finishedAt?
+  firstDealerId, status ('active'|'finished'), winner?, currentTrump?,
+  createdAt, finishedAt?
 
 families/{passcode}/games/{gameId}/hands/{handId}
   handNumber, dealerId, bidderId, bidTeam, bid (number | 'moon'),
-  pointsTaken, moonMade? (moons only), rookHolderId?, createdAt
+  pointsTaken, moonMade? (moons only), rookHolderId?, trump?, createdAt
 ```
 
 The dealer for the next hand is always the seat after the previous hand's

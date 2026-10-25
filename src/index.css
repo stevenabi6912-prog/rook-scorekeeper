@@ -278,3 +278,14 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .gate .input { font-size: 1.3rem; text-align: center; letter-spacing: 0.08em; min-height: 58px; }
 .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 24px auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Trump */
+.trump-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.7); box-shadow: 0 0 0 1px rgba(0,0,0,0.25); vertical-align: -2px; flex-shrink: 0; }
+.trump-dot.lg { width: 22px; height: 22px; }
+.chip.trump { gap: 8px; }
+.chip.trump.selected { color: #fff; border-color: transparent; }
+.trump-card { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; margin-bottom: 14px; }
+.trump-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+.trump-card .name { font-size: 1.25rem; font-weight: 700; }
+.trump-card .chips { margin-top: 8px; }
+.trump-card .chip { min-height: 42px; padding: 6px 10px; font-size: 0.9rem; }

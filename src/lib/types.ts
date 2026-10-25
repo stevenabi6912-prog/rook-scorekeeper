@@ -27,11 +27,28 @@ export interface Game {
   firstDealerId: string
   status: GameStatus
   winner?: TeamId | null
+  /** Trump for the hand being played right now, set from the live screen so
+   *  every phone shows it. Cleared when that hand is saved. */
+  currentTrump?: Trump | null
   createdAt: number
   finishedAt?: number
 }
 
 export type Bid = number | 'moon'
+
+/** Rook suits are colors. */
+export type Trump = 'red' | 'yellow' | 'green' | 'black'
+
+export const TRUMPS: { id: Trump; label: string; color: string }[] = [
+  { id: 'red', label: 'Red', color: '#d32f2f' },
+  { id: 'yellow', label: 'Yellow', color: '#f0b429' },
+  { id: 'green', label: 'Green', color: '#2e7d32' },
+  { id: 'black', label: 'Black', color: '#3a3f47' },
+]
+
+export function trumpInfo(t: Trump | null | undefined) {
+  return TRUMPS.find((x) => x.id === t)
+}
 
 export interface Hand {
   id: string
@@ -45,6 +62,8 @@ export interface Hand {
   /** Only present when bid === 'moon'. */
   moonMade?: boolean
   rookHolderId?: string | null
+  /** Trump suit named by the bidder. */
+  trump?: Trump | null
   createdAt: number
 }
 
@@ -54,7 +73,7 @@ export type HandInput = Omit<Hand, 'id' | 'createdAt' | 'handNumber'>
 export const RULES = {
   TOTAL_POINTS: 120,
   TARGET_SCORE: 500,
-  MIN_BID: 50,
+  MIN_BID: 65,
   MAX_BID: 120,
   BID_STEP: 5,
   POINT_STEP: 5,

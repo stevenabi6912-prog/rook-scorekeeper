@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { Dialog } from '../components/Dialog'
+import { TrumpPicker } from '../components/TrumpPicker'
 import { TopBar } from '../components/Layout'
 import { useStore } from '../data/StoreContext'
 import { useGame, useHands, usePlayers } from '../hooks/useData'
 import { BID_OPTIONS, currentTotals, isValidBid, isValidPoints, replayHands, scoreHand, type Scores } from '../lib/scoring'
 import { nextDealerId, teamOf } from '../lib/seating'
-import { otherTeam, RULES, type Bid, type Game, type Hand, type HandInput, type Player, type TeamId } from '../lib/types'
+import { otherTeam, RULES, type Bid, type Game, type Hand, type HandInput, type Player, type TeamId, type Trump } from '../lib/types'
 
 export function HandFormPage() {
   const { gameId, handId } = useParams()
@@ -52,6 +53,8 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
   const [pointsTouched, setPointsTouched] = useState(!!editing)
   const [moonMade, setMoonMade] = useState<boolean | null>(editing?.bid === 'moon' ? (editing.moonMade ?? null) : null)
   const [rookHolderId, setRookHolderId] = useState<string | null>(editing?.rookHolderId ?? null)
+  // New hands start with whatever trump was set on the live screen.
+  const [trump, setTrump] = useState<Trump | null>(editing ? (editing.trump ?? null) : (game.currentTrump ?? null))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -88,6 +91,7 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
           pointsTaken: effectivePoints,
           ...(isMoon ? { moonMade: moonMade === true } : {}),
           rookHolderId,
+          trump,
         }
       : null
 
@@ -174,7 +178,7 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
             {BID_OPTIONS.map((b) => (
               <button key={b} className={`chip${bid === b ? ' selected' : ''}`} onClick={() => chooseBid(b)} aria-pressed={bid === b}>{b}</button>
             ))}
-            <button className={`chip${isMoon ? ' selected' : ''}`} style={{ gridColumn: 'span 1' }} onClick={() => chooseBid('moon')} aria-pressed={isMoon}>🌙 Moon</button>
+            <button className={`chip${isMoon ? ' selected' : ''}`} style={{ gridColumn: '1 / -1' }} onClick={() => chooseBid('moon')} aria-pressed={isMoon}>🌙 Moon</button>
           </div>
         </section>
 
@@ -213,6 +217,11 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
             {bidTeam && !isMoon && <p className="muted small" style={{ marginTop: 6 }}>{game.teams[otherTeam(bidTeam)].name} took {RULES.TOTAL_POINTS - Math.min(RULES.TOTAL_POINTS, Math.max(0, points))}.</p>}
           </section>
         )}
+
+        <section className="section">
+          <h3>Trump</h3>
+          <TrumpPicker value={trump} onChange={setTrump} size="grid" />
+        </section>
 
         <section className="section">
           <h3>Who held the Rook? (optional)</h3>

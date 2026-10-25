@@ -192,3 +192,16 @@ describe('teamsAtTarget', () => {
     expect(teamsAtTarget(at(510, 505))).toEqual(['A', 'B'])
   })
 })
+
+describe('bid options', () => {
+  it('run from 65 to 120 in steps of 5, and accept Moon', async () => {
+    const { BID_OPTIONS, isValidBid } = await import('./scoring')
+    expect(BID_OPTIONS[0]).toBe(65)
+    expect(BID_OPTIONS[BID_OPTIONS.length - 1]).toBe(120)
+    expect(BID_OPTIONS).toHaveLength(12)
+    expect(isValidBid(60)).toBe(false)
+    expect(isValidBid(65)).toBe(true)
+    expect(isValidBid(67)).toBe(false)
+    expect(isValidBid('moon')).toBe(true)
+  })
+})

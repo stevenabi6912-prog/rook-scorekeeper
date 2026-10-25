@@ -26,7 +26,7 @@ export function SettingsPage() {
           <h3>Rules (fixed)</h3>
           <ul className="small" style={{ paddingLeft: 18, margin: 0 }}>
             <li>120 points per hand, play to 500.</li>
-            <li>Bids 50–120 in steps of 5, or Moon.</li>
+            <li>Bids 65–120 in steps of 5, or Moon.</li>
             <li>Made bid: bidders +points, others +rest. Set: bidders −bid, others +rest.</li>
             <li>Moon made: bidders jump to the next 500 above. Moon missed: bidders drop to the next 500 below, others +what was left.</li>
           </ul>

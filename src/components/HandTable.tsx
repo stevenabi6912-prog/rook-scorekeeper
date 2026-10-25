@@ -1,5 +1,6 @@
 import { describeBid, type ScoredHand } from '../lib/scoring'
-import { otherTeam, type Game, type Player, type TeamId } from '../lib/types'
+import { otherTeam, trumpInfo, type Game, type Player, type TeamId } from '../lib/types'
+import { TrumpDot } from './TrumpPicker'
 
 interface Props {
   game: Game
@@ -35,6 +36,7 @@ export function HandTable({ game, scored, byId, onSelect }: Props) {
                   <span className={`badge ${outcome.made ? 'good' : 'bad'}`}>{outcome.made ? 'Made' : hand.bid === 'moon' ? 'Missed' : 'Set'}</span>
                 </span>
                 <span className="line small">
+                  {hand.trump && <><TrumpDot trump={hand.trump} /> {trumpInfo(hand.trump)?.label} · </>}
                   Took {hand.pointsTaken} · Dealer {name(hand.dealerId)}{hand.rookHolderId ? ` · Rook: ${name(hand.rookHolderId)}` : ''}
                 </span>
               </td>

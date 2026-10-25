@@ -87,7 +87,11 @@ export function createLocalStore(familyCode: string): DataStore {
       const existing = data.hands[gid] ?? []
       const handNumber = existing.reduce((m, h) => Math.max(m, h.handNumber), 0) + 1
       const h: Hand = clean({ ...hand, id: id(), handNumber, createdAt: Date.now() })
-      data = { ...data, hands: { ...data.hands, [gid]: [...existing, h] } }
+      data = {
+        ...data,
+        games: data.games.map((g) => (g.id === gid ? { ...g, currentTrump: null } : g)),
+        hands: { ...data.hands, [gid]: [...existing, h] },
+      }
       save()
       return h.id
     },

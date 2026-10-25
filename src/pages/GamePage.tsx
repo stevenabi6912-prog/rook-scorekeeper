@@ -4,11 +4,12 @@ import { Dialog } from '../components/Dialog'
 import { HandTable } from '../components/HandTable'
 import { TopBar } from '../components/Layout'
 import { DealerCard, ScoreBoard } from '../components/ScoreBoard'
+import { TrumpDot, TrumpPicker } from '../components/TrumpPicker'
 import { useStore } from '../data/StoreContext'
 import { useGame, useHands, usePlayers } from '../hooks/useData'
 import { leadingTeam, replayHands, teamsAtTarget } from '../lib/scoring'
 import { nextDealerId } from '../lib/seating'
-import { RULES, type TeamId } from '../lib/types'
+import { RULES, trumpInfo, type TeamId } from '../lib/types'
 
 export function GamePage() {
   const { gameId } = useParams()
@@ -83,9 +84,21 @@ export function GamePage() {
         <ScoreBoard game={game} totals={totals} byId={byId} />
 
         {isActive && (
-          <div onClick={() => setOverrideOpen(true)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOverrideOpen(true)}>
-            <DealerCard dealer={dealer} label={`Dealer for hand ${scored.length + 1} · tap to change`} />
-          </div>
+          <>
+            <div onClick={() => setOverrideOpen(true)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOverrideOpen(true)}>
+              <DealerCard dealer={dealer} label={`Dealer for hand ${scored.length + 1} · tap to change`} />
+            </div>
+            <div className="trump-card" style={{ display: 'block' }}>
+              <div className="row">
+                <TrumpDot trump={game.currentTrump} size="lg" />
+                <div>
+                  <div className="label">Trump this hand</div>
+                  <div className="name">{trumpInfo(game.currentTrump)?.label ?? 'Not set yet'}</div>
+                </div>
+              </div>
+              <TrumpPicker value={game.currentTrump} onChange={(t) => store.updateGame(game.id, { currentTrump: t })} />
+            </div>
+          </>
         )}
 
         <section className="section">

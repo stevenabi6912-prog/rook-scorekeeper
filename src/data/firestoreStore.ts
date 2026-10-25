@@ -103,6 +103,8 @@ export function createFirestoreStore(db: Firestore, familyCode: string): DataSto
     async addHand(gameId, hand: HandInput) {
       const handNumber = await nextHandNumber(gameId)
       const ref = await addDoc(hands(gameId), clean({ ...hand, handNumber, createdAt: Date.now() }))
+      // The hand is over, so the "trump right now" indicator resets.
+      await updateDoc(doc(games, gameId), { currentTrump: null })
       return ref.id
     },
     updateHand(gameId, handId, patch) {

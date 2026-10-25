@@ -53,7 +53,10 @@ service cloud.firestore {
           && request.resource.data.createdAt is number;
         allow update: if signedIn() && validCode(code)
           && request.resource.data.status in ['active', 'finished']
-          && request.resource.data.handedness == resource.data.handedness;
+          && request.resource.data.handedness == resource.data.handedness
+          && (!('currentTrump' in request.resource.data)
+              || request.resource.data.currentTrump == null
+              || request.resource.data.currentTrump in ['red', 'yellow', 'green', 'black']);
         allow delete: if signedIn() && validCode(code);
 
         match /hands/{handId} {
@@ -63,10 +66,11 @@ service cloud.firestore {
               && h.bidderId is string
               && h.bidTeam in ['A', 'B']
               && (h.bid == 'moon'
-                  || (h.bid is int && h.bid >= 50 && h.bid <= 120 && h.bid % 5 == 0))
+                  || (h.bid is int && h.bid >= 65 && h.bid <= 120 && h.bid % 5 == 0))
               && h.pointsTaken is int && h.pointsTaken >= 0 && h.pointsTaken <= 120 && h.pointsTaken % 5 == 0
               && (h.bid != 'moon' || h.moonMade is bool)
-              && (!('rookHolderId' in h) || h.rookHolderId == null || h.rookHolderId is string);
+              && (!('rookHolderId' in h) || h.rookHolderId == null || h.rookHolderId is string)
+              && (!('trump' in h) || h.trump == null || h.trump in ['red', 'yellow', 'green', 'black']);
           }
           allow read: if signedIn() && validCode(code);
           allow create, update: if signedIn() && validCode(code) && validHand(request.resource.data);
