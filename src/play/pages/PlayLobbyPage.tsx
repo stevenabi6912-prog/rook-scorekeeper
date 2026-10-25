@@ -32,14 +32,23 @@ export function PlayLobbyPage() {
   const newTable = async (game: Game) => {
     const hands = sortHands(handsByGame?.[game.id] ?? [])
     const dealerId = nextDealerId(game, hands)
-    const id = await matchStore.createMatch({
+    try {
+      const id = await createTable(game, hands.length, dealerId)
+      navigate(`/play/${id}`)
+    } catch (e) {
+      setError(describeStoreError(e as Error))
+    }
+  }
+
+  const createTable = (game: Game, handsSoFar: number, dealerId: string) =>
+    matchStore.createMatch({
       gameId: game.id,
       handedness: game.handedness,
       hostUid: matchStore.uid,
       status: 'seating',
       seats: game.seatOrder.map((playerId) => ({ playerId, team: teamOf(game.teams, playerId) ?? 'A', uid: null, bot: false })),
       handNumber: 0,
-      firstHandNumber: hands.length + 1,
+      firstHandNumber: handsSoFar + 1,
       dealerSeat: Math.max(0, game.seatOrder.indexOf(dealerId)),
       dealSeed: null,
       pub: null,
@@ -48,8 +57,6 @@ export function PlayLobbyPage() {
       scoredHandNumber: 0,
       winner: null,
     })
-    navigate(`/play/${id}`)
-  }
 
   return (
     <>
