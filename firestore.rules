@@ -58,10 +58,12 @@ service cloud.firestore {
           return match().seats[seat].uid;
         }
         function isSeated() {
-          // Any seat held by this phone.
+          // Any seat held by this phone. Seats 4 and 5 only exist at a 6-player table.
           return signedIn() && (
             seatUid(0) == request.auth.uid || seatUid(1) == request.auth.uid || seatUid(2) == request.auth.uid
-            || seatUid(3) == request.auth.uid || seatUid(4) == request.auth.uid || seatUid(5) == request.auth.uid);
+            || seatUid(3) == request.auth.uid
+            || (match().seats.size() > 4 && seatUid(4) == request.auth.uid)
+            || (match().seats.size() > 5 && seatUid(5) == request.auth.uid));
         }
         function betweenHands() {
           return match().pub == null || match().pub.phase == 'over';
