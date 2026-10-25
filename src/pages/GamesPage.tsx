@@ -1,0 +1,81 @@
+import { Link, useNavigate } from 'react-router-dom'
+import { TopBar } from '../components/Layout'
+import { useStoreContext } from '../data/StoreContext'
+import { useAllHands, useGames, usePlayers } from '../hooks/useData'
+import { summarizeGame } from '../lib/stats'
+import type { Game, Hand, Player } from '../lib/types'
+
+export function GamesPage() {
+  const { games, loading, error } = useGames()
+  const { byId } = usePlayers()
+  const handsByGame = useAllHands(games)
+  const { demoMode } = useStoreContext()
+  const navigate = useNavigate()
+
+  const active = (games ?? []).filter((g) => g.status === 'active')
+  const past = (games ?? []).filter((g) => g.status === 'finished')
+
+  return (
+    <>
+      <TopBar
+        title="Rook"
+        right={<Link className="icon-btn" to="/settings" aria-label="Settings">⚙️</Link>}
+      />
+      <main className="page">
+        {demoMode && <div className="notice small">Demo mode: data stays on this device. Configure Firebase to sync between phones.</div>}
+        {error && <div className="error">{error}</div>}
+        {loading && <div className="spinner" />}
+
+        {!loading && (
+          <>
+            <section className="section">
+              <h3>In progress</h3>
+              {active.length === 0 && <div className="empty">No game in progress.</div>}
+              <div className="list">
+                {active.map((g) => (
+                  <GameCard key={g.id} game={g} hands={handsByGame?.[g.id]} byId={byId} onClick={() => navigate(`/game/${g.id}`)} />
+                ))}
+              </div>
+            </section>
+            <section className="section">
+              <h3>Past games</h3>
+              {past.length === 0 && <div className="empty">Finished games will show up here.</div>}
+              <div className="list">
+                {past.map((g) => (
+                  <GameCard key={g.id} game={g} hands={handsByGame?.[g.id]} byId={byId} onClick={() => navigate(`/game/${g.id}`)} />
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+      </main>
+      <div className="fab-bar">
+        <Link className="btn primary big block" to="/new">＋ New game</Link>
+      </div>
+    </>
+  )
+}
+
+function GameCard({ game, hands, byId, onClick }: { game: Game; hands: Hand[] | undefined; byId: Map<string, Player>; onClick: () => void }) {
+  const summary = hands ? summarizeGame(game, hands) : null
+  const names = (ids: string[]) => ids.map((id) => byId.get(id)?.name ?? '?').join(', ')
+  const date = new Date(game.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return (
+    <div className="card tappable" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
+      <div className="row between">
+        <span className="muted small">{date} · {game.handedness}-handed{summary ? ` · ${summary.handCount} hand${summary.handCount === 1 ? '' : 's'}` : ''}</span>
+        {game.status === 'finished' && game.winner && <span className={`badge team-${game.winner}`}>Winner: {game.teams[game.winner].name}</span>}
+        {game.status === 'active' && <span className="badge good">Live</span>}
+      </div>
+      {(['A', 'B'] as const).map((t) => (
+        <div key={t} className="row between" style={{ marginTop: 8 }}>
+          <div className="grow">
+            <div className="truncate"><span className={`badge team-${t}`}>{t}</span> <strong>{game.teams[t].name}</strong></div>
+            <div className="muted small truncate">{names(game.teams[t].playerIds)}</div>
+          </div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{summary ? summary.totals[t] : '…'}</div>
+        </div>
+      ))}
+    </div>
+  )
+}

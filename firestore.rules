@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// Rook Scorekeeper rules.
+//
+// Everything lives under /families/{code}/... where {code} is the family
+// passcode. Anyone who has signed in (anonymously) AND knows the passcode can
+// read and write that family's data. Nothing outside /families is reachable.
+//
+// This is deliberately simple and is appropriate for a family scoreboard, not
+// for sensitive data. See README.md ("Security model and its limits").
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Passcodes are normalized client-side to 4-64 chars; reject anything else
+    // so random probing of short codes is less attractive.
+    function validCode(code) {
+      return code.size() >= 4 && code.size() <= 64;
+    }
+
+    match /families/{code} {
+      // The family document itself is never written; only its subcollections.
+      allow read: if signedIn() && validCode(code);
+      allow write: if false;
+
+      match /players/{playerId} {
+        allow read: if signedIn() && validCode(code);
+        allow create: if signedIn() && validCode(code)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 60
+          && request.resource.data.archived is bool
+          && request.resource.data.createdAt is number;
+        allow update: if signedIn() && validCode(code)
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 60;
+        allow delete: if false;
+      }
+
+      match /games/{gameId} {
+        allow read: if signedIn() && validCode(code);
+        allow create: if signedIn() && validCode(code)
+          && request.resource.data.handedness in [4, 6]
+          && request.resource.data.status == 'active'
+          && request.resource.data.seatOrder is list
+          && request.resource.data.seatOrder.size() == request.resource.data.handedness
+          && request.resource.data.teams.A.playerIds is list
+          && request.resource.data.teams.B.playerIds is list
+          && request.resource.data.createdAt is number;
+        allow update: if signedIn() && validCode(code)
+          && request.resource.data.status in ['active', 'finished']
+          && request.resource.data.handedness == resource.data.handedness;
+        allow delete: if signedIn() && validCode(code);
+
+        match /hands/{handId} {
+          function validHand(h) {
+            return h.handNumber is int && h.handNumber >= 1
+              && h.dealerId is string
+              && h.bidderId is string
+              && h.bidTeam in ['A', 'B']
+              && (h.bid == 'moon'
+                  || (h.bid is int && h.bid >= 50 && h.bid <= 120 && h.bid % 5 == 0))
+              && h.pointsTaken is int && h.pointsTaken >= 0 && h.pointsTaken <= 120 && h.pointsTaken % 5 == 0
+              && (h.bid != 'moon' || h.moonMade is bool)
+              && (!('rookHolderId' in h) || h.rookHolderId == null || h.rookHolderId is string);
+          }
+          allow read: if signedIn() && validCode(code);
+          allow create, update: if signedIn() && validCode(code) && validHand(request.resource.data);
+          allow delete: if signedIn() && validCode(code);
+        }
+      }
+    }
+  }
+}
