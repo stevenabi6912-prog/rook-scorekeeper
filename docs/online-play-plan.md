@@ -201,6 +201,7 @@ each maps to a field in `src/game/rules.ts`.
 | 26 | No last-trick bonus beyond the nest. | built in |
 | 28 | Rook holder recorded as the player dealt the Rook. If the Rook came up in the Kitty it is recorded as **"Kitty"**, not the bidder who picked it up (Steven). History shows "Rook: Kitty", stats credit nobody, and the manual hand form gets a Kitty chip too. | `rookHolderSeat`, `ROOK_IN_KITTY` |
 | 29 | **Overshoot (confirmed):** when someone bids Moon, the dealer may (not must) "over shoot" and take the Moon themselves. Scored exactly like a normal Moon; the first shooter cannot respond; the auction ends. Because a Moon must be a first call (17b) and the dealer calls last in the first round, the dealer has never bid or passed when the offer comes, so the "dealer already passed" case cannot arise under these rules. If the dealer shoots, nobody can overshoot. | `dealerMayOvershoot: true` |
+| 29b | **Throw the cards in (Steven, 2026-10-25):** a player on lead whose every card is unbeatable by anything still held (a trump nobody can top, or, when nobody else has trump left, a plain card nobody can top in its color) may end the hand at once; every remaining trick and the Kitty go to their team. The engine proves it before allowing it, so there is never a dispute. Bots do it automatically. | `canClaimRest`, action `claim` |
 | 30 | Steven sent photos of the family deck: the classic Parker Brothers / Hasbro Rook deck. White faces; a big numeral top-left in the card's color with the color name printed vertically beside it ("RED", "BLACK", "GREEN", "YELLOW"); a small square badge with the point value under the numeral on point cards; a large numeral in the center inside a thin square frame; the whole index repeated upside down bottom-right. Green is a blue-green, yellow is golden. The Rook card is a drawn bird with "ROOK" vertical and a big "20". Backs are light blue with a scribbled texture and the ROOK logo. The `Card` component reproduces this layout; the back uses the same blue texture with the family's raven instead of the trademarked logo. | `Card.tsx` |
 | 31 | Sound style: default stands (realistic card sounds, a few short musical cues for bids, trump, Moon, your turn). | `sound.ts` |
 | 32 | **Voice notes: yes.** See 3.10. | messages `kind: 'voice'` |
@@ -511,7 +512,7 @@ through the same `useX` hook style as `useGame`/`useHands`. The UI is a pure
 function of (match, my seat index, my cards), so a reload rebuilds the exact
 screen.
 
-A move (bid, discard, name trump, play card) is a Firestore **transaction**:
+A move (bid, lay down, name trump, play card, throw the cards in) is a Firestore **transaction**:
 
 1. Read the match doc.
 2. Check `phase` and that `turnSeat` is my seat.

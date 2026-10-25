@@ -12,6 +12,8 @@ export interface HandResult {
   moonMade: boolean
   /** Every trick was played (false when a hand was cut short by a broken Moon). */
   complete: boolean
+  /** Seat that threw the cards in, if the hand ended on a claim. */
+  claimedBySeat: number | null
 }
 
 function emptyTeams(): Record<TeamId, number> {
@@ -46,7 +48,7 @@ export function summarizeHand(state: HandState): HandResult {
   const complete = state.hands.every((h) => h.length === 0)
   if (state.bid === 'moon') {
     const moonMade = complete && moonStillPossible(state)
-    return { bidTeam, bid: 'moon', pointsByTeam: points, tricksByTeam: tricks, made: moonMade, moonMade, complete }
+    return { bidTeam, bid: 'moon', pointsByTeam: points, tricksByTeam: tricks, made: moonMade, moonMade, complete, claimedBySeat: state.claimedBySeat }
   }
   return {
     bidTeam,
@@ -56,6 +58,7 @@ export function summarizeHand(state: HandState): HandResult {
     made: points[bidTeam] >= state.bid,
     moonMade: false,
     complete,
+    claimedBySeat: state.claimedBySeat,
   }
 }
 

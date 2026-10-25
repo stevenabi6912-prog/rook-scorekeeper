@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useSearchParams } from 'react-router-dom'
 import { botBid, botDiscard, botPlay, botTrump } from '../../game/bots'
 import type { CardId } from '../../game/cards'
-import { applyAction, legalBids, legalPlays, startHand, type Action, type BidAction, type HandState } from '../../game/engine'
+import { applyAction, canClaimRest, legalBids, legalPlays, startHand, type Action, type BidAction, type HandState } from '../../game/engine'
 import { randomSeed, seededRng } from '../../game/rng'
 import { FAMILY_RULES } from '../../game/rules'
 import { summarizeHand, tallies, toHandInput, type HandResult } from '../../game/score'
@@ -116,6 +116,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
         else sounds.pass()
       } else if (action.type === 'trump') sounds.trump()
       else if (action.type === 'discard') sounds.trickSweep()
+      else if (action.type === 'claim') sounds.trickSweep()
       else if (action.type === 'play') sounds.cardSlide()
       return r.state
     })
@@ -162,7 +163,11 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
       else if (state.phase === 'overshoot') act({ type: 'overshoot', seat, accept: rng() < 0.15 })
       else if (state.phase === 'nest') act({ type: 'discard', seat, cards: botDiscard(state, seat) })
       else if (state.phase === 'trump') act({ type: 'trump', seat, trump: botTrump(state, seat) })
-      else if (state.phase === 'playing') act({ type: 'play', seat, card: botPlay(state, seat, rng) })
+      else if (state.phase === 'playing') {
+        // A bot that cannot lose another trick throws the cards in rather than playing it out.
+        if (canClaimRest(state, seat)) act({ type: 'claim', seat })
+        else act({ type: 'play', seat, card: botPlay(state, seat, rng) })
+      }
     }, BOT_DELAY + rng() * 500)
     return () => clearTimeout(timer)
   }, [state, busy, act, rng, AUTOPILOT])
@@ -212,6 +217,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myTurn, decisionKey, act, rng])
   const exchanging = state.phase === 'nest' && myTurn
+  const claimable = myTurn && canClaimRest(state, ME)
   const legal = state.phase === 'playing' && myTurn ? legalPlays(state, ME) : exchanging ? state.hands[ME] : []
   const bidOptions: BidAction[] = state.phase === 'bidding' && myTurn ? legalBids(state, ME) : []
 
@@ -324,6 +330,11 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
               </span>
             )}
           </div>
+          {claimable && (
+            <button type="button" className="btn claim-btn" onClick={() => act({ type: 'claim', seat: ME })}>
+              Throw cards in
+            </button>
+          )}
           {state.phase === 'playing' && myTurn && selected.length > 0 && (
             <button type="button" className="btn primary play-btn" onClick={playSelected}>Play</button>
           )}
@@ -382,6 +393,7 @@ function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: 
     case 'playing': {
       if (!myTurn) return `${who} is thinking…`
       if (selected.length) return 'Tap again or press Play'
+      if (canClaimRest(state, ME)) return 'Nobody can beat you now'
       const lead = state.trick.plays[0]
       if (!lead) return 'Your lead'
       return 'Your turn'

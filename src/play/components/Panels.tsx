@@ -101,6 +101,7 @@ export function HandSummary({
         <div className="summary-headline">{headline}</div>
         <div className="summary-sub">
           Bid {result.bid === 'moon' ? 'Moon' : result.bid} · took {result.pointsByTeam[bt]} of 120 · {result.tricksByTeam[bt]} tricks
+          {result.claimedBySeat !== null && <> · {seats[result.claimedBySeat].name} threw the cards in</>}
         </div>
         <div className="summary-teams">
           {([bt, ot] as TeamId[]).map((t) => (

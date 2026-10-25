@@ -5,6 +5,7 @@ import { ROOK, type CardId } from './cards'
 import type { Deal } from './deal'
 import {
   applyAction,
+  canClaimRest,
   exposedNestCard,
   legalBids,
   legalPlays,
@@ -430,6 +431,73 @@ describe('trick winner', () => {
   it('the 1 is high when it is in play', () => {
     const withOnes = { ...R, removedRanks: [2, 3, 4] }
     expect(trickWinner(t(['R14', 'R1', 'R10', 'R5']), 'green', withOnes)).toBe(1)
+  })
+})
+
+describe('throwing the cards in', () => {
+  // Trump is green. Seat 0 holds the top trumps; nobody else has any trump.
+  const unbeatable = () =>
+    throughBidding(
+      fixed([
+        ['G14', ROOK],
+        ['R14', 'Y9'],
+        ['Y5', 'B8'],
+        ['R7', 'B14'],
+      ]),
+      0,
+      80,
+      'green',
+    )
+
+  it('is allowed on lead when nothing left can beat any of your cards', () => {
+    const s = unbeatable()
+    expect(canClaimRest(s, 0)).toBe(true)
+    expect(canClaimRest(s, 1)).toBe(false) // not on lead
+    const done = mustApply(s, { type: 'claim', seat: 0 })
+    expect(done.phase).toBe('over')
+    expect(done.claimedBySeat).toBe(0)
+    expect(done.tricks).toHaveLength(2)
+    expect(done.tricks.every((t) => t.winnerSeat === 0)).toBe(true)
+    expect(done.tricks[1].tookNest).toBe(true)
+    expect(done.hands.flat()).toHaveLength(0)
+    // all the points left on the table: G14 10 + ROOK 20 + R14 10 + Y5 5 + B14 10
+    expect(done.tricks.reduce((n, t) => n + t.points, 0)).toBe(55)
+  })
+
+  it('is refused when an opponent still holds a higher trump, or you hold a beatable plain card', () => {
+    const higherTrumpOut = throughBidding(fixed([['G13', 'R5'], ['G14', 'Y9'], ['Y5', 'B8'], ['R7', 'B14']]), 0, 80, 'green')
+    expect(canClaimRest(higherTrumpOut, 0)).toBe(false)
+    expect(applyAction(higherTrumpOut, { type: 'claim', seat: 0 })).toMatchObject({ ok: false, error: /still take/ })
+
+    const plainBeatable = throughBidding(fixed([['R13', 'R12'], ['R14', 'Y9'], ['Y5', 'B8'], ['R7', 'B14']]), 0, 80, 'green')
+    expect(canClaimRest(plainBeatable, 0)).toBe(false)
+
+    // High plain cards are fine only when nobody has trump left to ruff them.
+    const plainSafe = throughBidding(fixed([['R14', 'B14'], ['R13', 'Y9'], ['Y5', 'B8'], ['R7', 'B13']]), 0, 80, 'green')
+    expect(canClaimRest(plainSafe, 0)).toBe(true)
+    const ruffable = throughBidding(fixed([['R14', 'B14'], ['R13', 'G5'], ['Y5', 'B8'], ['R7', 'B13']]), 0, 80, 'green')
+    expect(canClaimRest(ruffable, 0)).toBe(false)
+  })
+
+  it('cannot be used mid-trick', () => {
+    let s = unbeatable()
+    s = mustApply(s, play(0, 'G14'))
+    expect(canClaimRest(s, 1)).toBe(false)
+    expect(applyAction(s, { type: 'claim', seat: 1 }).ok).toBe(false)
+  })
+
+  it('makes a Moon when the claimer\'s team already had every trick', () => {
+    let s = throughBidding(fixed([['G14', ROOK, 'G5'], ['R14', 'Y9', 'Y6'], ['Y5', 'B8', 'B9'], ['R7', 'B14', 'R8']]), 0, 'moon', 'green')
+    s = mustApply(s, play(0, 'G5'))
+    s = mustApply(s, play(1, 'Y6'))
+    s = mustApply(s, play(2, 'B9'))
+    s = mustApply(s, play(3, 'R8'))
+    expect(s.turnSeat).toBe(0)
+    expect(canClaimRest(s, 0)).toBe(true)
+    const done = mustApply(s, { type: 'claim', seat: 0 })
+    expect(done.tricks.every((t) => t.winnerSeat === 0)).toBe(true)
+    // G14 10 + ROOK 20 + G5 5 + R14 10 + Y5 5 + B14 10
+    expect(done.tricks.reduce((n, t) => n + t.points, 0)).toBe(60)
   })
 })
 

@@ -187,6 +187,7 @@
 }
 .my-row { display: flex; align-items: center; gap: 10px; padding: 0 6px; min-height: 44px; }
 .my-status { flex: 1; font-weight: 700; font-size: 0.95rem; }
+.claim-btn { min-height: 40px; padding: 6px 14px; background: #fff; border-color: #fff; color: #0f4527; font-weight: 800; animation: pop 0.25s ease-out; }
 .play-btn { min-height: 40px; padding: 6px 18px; background: #ffd54a; border-color: #ffd54a; color: #3a2a00; font-weight: 800; }
 
 .action-panel {

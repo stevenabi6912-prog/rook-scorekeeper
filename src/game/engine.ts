@@ -70,6 +70,8 @@ export interface HandState {
   turnSeat: number
   trick: Trick
   tricks: TakenTrick[]
+  /** Seat that threw the cards in to end the hand early, if any. */
+  claimedBySeat: number | null
 }
 
 export type Action =
@@ -78,6 +80,8 @@ export type Action =
   | { type: 'discard'; seat: number; cards: CardId[] }
   | { type: 'trump'; seat: number; trump: Suit }
   | { type: 'play'; seat: number; card: CardId }
+  /** "Throw the cards in": the seat on lead cannot lose another trick, so the hand ends now. */
+  | { type: 'claim'; seat: number }
 
 export type Result = { ok: true; state: HandState } | { ok: false; error: string }
 
@@ -133,6 +137,7 @@ export function startHandFromDeal(opts: Omit<StartHandOptions, 'seed'>, dealt: D
     turnSeat: first,
     trick: { leadSeat: first, plays: [] },
     tricks: [],
+    claimedBySeat: null,
   }
 }
 
@@ -350,6 +355,61 @@ function applyPlay(state: HandState, seat: number, card: CardId): Result {
   return succeed({ ...state, hands, tricks, trick: { leadSeat: winnerSeat, plays: [] }, turnSeat: winnerSeat })
 }
 
+/* -------------------------------------------------------------------- claim */
+
+/**
+ * Can `seat` throw the cards in? Only when they are on lead and every card
+ * they hold would win if led: a trump that no other player can top (the
+ * Rook counts as a trump), or a plain card of a color nobody else can top
+ * while nobody else holds any trump. Every remaining trick is then theirs
+ * whatever anyone does. This is a sufficient test, not a complete one; a
+ * hand that needs a particular order of leads is not claimable.
+ */
+export function canClaimRest(state: HandState, seat: number): boolean {
+  if (state.phase !== 'playing' || state.turnSeat !== seat || state.trick.plays.length > 0) return false
+  const trump = state.trump
+  if (!trump) return false
+  const mine = state.hands[seat]
+  if (mine.length === 0) return false
+  const others = state.hands.flatMap((h, i) => (i === seat ? [] : h))
+  const othersTrump = others.filter((c) => effectiveSuit(c, trump) === trump)
+  const top = (cards: CardId[]) => cards.reduce((m, c) => Math.max(m, strength(c, state.rules)), -Infinity)
+  const bestOtherTrump = top(othersTrump)
+  return mine.every((card) => {
+    const suit = effectiveSuit(card, trump)
+    const mine = strength(card, state.rules)
+    if (suit === trump) return mine > bestOtherTrump
+    if (othersTrump.length > 0) return false
+    return mine > top(others.filter((c) => effectiveSuit(c, trump) === suit))
+  })
+}
+
+function applyClaim(state: HandState, seat: number): Result {
+  if (state.phase !== 'playing') return fail('The hand is not being played.')
+  if (state.turnSeat !== seat || state.trick.plays.length > 0) return fail('You can only throw the cards in on your lead.')
+  if (!canClaimRest(state, seat)) return fail('Someone could still take a trick.')
+  const { rules, handedness } = state
+  const hands = state.hands.map((h) => [...h])
+  const tricks = [...state.tricks]
+  const remaining = hands[seat].length
+  // Record the rest as tricks won by the claimer, strongest lead first, so the
+  // archive is complete and every point is accounted for.
+  hands[seat].sort((a, b) => strength(b, rules) - strength(a, rules))
+  for (let t = 0; t < remaining; t++) {
+    const plays: Play[] = []
+    for (let i = 0; i < handedness; i++) {
+      const s = (seat + i) % handedness
+      const card = hands[s].shift()
+      if (card) plays.push({ seat: s, card })
+    }
+    const last = t === remaining - 1
+    const tookNest = last && rules.nestToLastTrick
+    const points = pointsIn(plays.map((p) => p.card), rules) + (tookNest ? pointsIn(state.nest, rules) : 0)
+    tricks.push({ leadSeat: seat, plays, winnerSeat: seat, points, tookNest })
+  }
+  return succeed({ ...state, hands, tricks, trick: { leadSeat: seat, plays: [] }, phase: 'over', turnSeat: seat, claimedBySeat: seat })
+}
+
 /* ------------------------------------------------------------------ reducer */
 
 export function applyAction(state: HandState, action: Action): Result {
@@ -364,6 +424,8 @@ export function applyAction(state: HandState, action: Action): Result {
       return applyTrump(state, action.seat, action.trump)
     case 'play':
       return applyPlay(state, action.seat, action.card)
+    case 'claim':
+      return applyClaim(state, action.seat)
   }
 }
 
