@@ -64,6 +64,31 @@ export function botBid(state: HandState, seat: number, rng: Rng): BidAction {
   return numbers.includes(choice) ? choice : lowest
 }
 
+/**
+ * Which cards to lay back into the Kitty: keep the intended trump and the
+ * Rook, then shed zero-point cards from the shortest colors, lowest first.
+ */
+export function botDiscard(state: HandState, seat: number): CardId[] {
+  const hand = state.hands[seat]
+  const keepSuit = botTrump(state, seat)
+  const groups = bySuit(hand)
+  const ranked = [...hand].sort((a, b) => {
+    const score = (c: CardId) => {
+      if (c === ROOK) return 1000
+      const suit = suitOf(c)!
+      const trumpBonus = suit === keepSuit ? 500 : 0
+      return trumpBonus + cardPoints(c, state.rules) * 10 + groups[suit].length * 3 + strength(c, state.rules)
+    }
+    return score(a) - score(b)
+  })
+  let picks = ranked.slice(0, state.nestPickedUp)
+  if (!state.rules.discardPointsAllowed) {
+    const free = ranked.filter((c) => cardPoints(c, state.rules) === 0)
+    if (free.length >= state.nestPickedUp) picks = free.slice(0, state.nestPickedUp)
+  }
+  return picks
+}
+
 function winnerIfPlayed(state: HandState, seat: number, card: CardId): number {
   const trick = { ...state.trick, plays: [...state.trick.plays, { seat, card }] }
   return trickWinner(trick, state.trump!, state.rules)

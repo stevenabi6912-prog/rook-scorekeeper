@@ -8,7 +8,7 @@ interface HandProps {
   trump: Suit | null
   /** Cards that may be played right now; others are dimmed. */
   legal: CardId[]
-  selected: CardId | null
+  selected: CardId[]
   onSelect: (card: CardId) => void
   disabled?: boolean
 }
@@ -32,7 +32,8 @@ export function HandFan({ cards, trump, legal, selected, onSelect, disabled }: H
 
   const sorted = sortHand(cards, trump, FAMILY_RULES)
   const n = sorted.length
-  const cardW = Math.min(96, Math.max(64, Math.floor(width / 4.2)))
+  // Smaller cards when holding the Kitty too (14 cards), so every card keeps a tappable strip.
+  const cardW = Math.min(96, Math.max(56, Math.floor(width / (n > 10 ? 5.4 : 4.2))))
   const step = n > 1 ? Math.min(cardW * 0.72, (width - cardW - 8) / (n - 1)) : 0
   const total = cardW + step * (n - 1)
   const left0 = (width - total) / 2
@@ -44,7 +45,7 @@ export function HandFan({ cards, trump, legal, selected, onSelect, disabled }: H
         const mid = (n - 1) / 2
         const rot = n > 1 ? (i - mid) * Math.min(3, 24 / n) : 0
         const lift = Math.abs(i - mid) * Math.min(2.2, 16 / n)
-        const isSelected = selected === id
+        const isSelected = selected.includes(id)
         const playable = legalSet.has(id) && !disabled
         const isTrump = trump !== null && effectiveSuit(id, trump) === trump
         return (

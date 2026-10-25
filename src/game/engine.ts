@@ -1,5 +1,5 @@
 import type { Handedness, TeamId } from '../lib/types'
-import { ROOK, effectiveSuit, pointsIn, strength, type CardId } from './cards'
+import { ROOK, cardPoints, effectiveSuit, pointsIn, strength, type CardId } from './cards'
 import { deal, type Deal } from './deal'
 import type { Rules, Suit } from './rules'
 
@@ -8,12 +8,12 @@ import type { Rules, Suit } from './rules'
  * reducer runs on every phone (optimistic UI), inside the Firestore
  * transaction that commits a move, and in the tests.
  *
- *   bidding -> (overshoot) -> trump -> playing -> over
+ *   bidding -> (overshoot) -> (nest: bidder picks up the Kitty and lays cards down) -> trump -> playing -> over
  */
 
 export type Bid = number | 'moon'
 export type BidAction = Bid | 'pass'
-export type Phase = 'bidding' | 'overshoot' | 'trump' | 'playing' | 'over'
+export type Phase = 'bidding' | 'overshoot' | 'nest' | 'trump' | 'playing' | 'over'
 
 export interface Play {
   seat: number
@@ -48,9 +48,15 @@ export interface HandState {
   /** Team of each seat, by seat index. */
   teams: TeamId[]
   dealerSeat: number
+  /** Cards each player was dealt (the bidder briefly holds more during the nest phase). */
+  handSize: number
   /** Cards still held, by seat. Private in the real game; the engine sees all. */
   hands: CardId[][]
+  /** The Kitty. Dealt face down (top card face up under nestTopExposed); empty while the
+   *  bidder holds it; then the cards the bidder laid down, face down, until the last trick. */
   nest: CardId[]
+  /** How many cards the bidder picked up and must lay back down (0 when nobody takes the nest). */
+  nestPickedUp: number
   /** Seat dealt the Rook, or null when it is in the nest. */
   rookHolderSeat: number | null
   phase: Phase
@@ -69,6 +75,7 @@ export interface HandState {
 export type Action =
   | { type: 'bid'; seat: number; bid: BidAction }
   | { type: 'overshoot'; seat: number; accept: boolean }
+  | { type: 'discard'; seat: number; cards: CardId[] }
   | { type: 'trump'; seat: number; trump: Suit }
   | { type: 'play'; seat: number; card: CardId }
 
@@ -106,8 +113,10 @@ export function startHandFromDeal(opts: Omit<StartHandOptions, 'seed'>, dealt: D
     handedness,
     teams: [...teams],
     dealerSeat,
+    handSize: dealt.hands[0]?.length ?? 0,
     hands: dealt.hands.map((h) => [...h]),
     nest: [...dealt.nest],
+    nestPickedUp: 0,
     rookHolderSeat: rookHolderSeat === -1 ? null : rookHolderSeat,
     phase: 'bidding',
     bidding: {
@@ -215,7 +224,7 @@ function nextActiveSeat(b: BiddingState, from: number, handedness: number): numb
 }
 
 function closeBidding(state: HandState, bidderSeat: number, bid: Bid, overshot = false): HandState {
-  return {
+  const next: HandState = {
     ...state,
     phase: 'trump',
     bidderSeat,
@@ -224,6 +233,38 @@ function closeBidding(state: HandState, bidderSeat: number, bid: Bid, overshot =
     turnSeat: bidderSeat,
     trick: { leadSeat: bidderSeat, plays: [] },
   }
+  // The bidder picks up the Kitty and must lay the same number of cards back down.
+  if (state.rules.bidderTakesNest && state.nest.length > 0) {
+    next.phase = 'nest'
+    next.hands = state.hands.map((h, i) => (i === bidderSeat ? [...h, ...state.nest] : h))
+    next.nest = []
+    next.nestPickedUp = state.nest.length
+    if (state.nest.includes(ROOK)) next.rookHolderSeat = bidderSeat
+  }
+  return next
+}
+
+/* --------------------------------------------------------------------- nest */
+
+/** Why `cards` cannot be laid down by `seat` right now, or null if they can. */
+export function discardProblem(state: HandState, seat: number, cards: CardId[]): string | null {
+  if (state.phase !== 'nest') return 'The Kitty is not being exchanged now.'
+  if (seat !== state.bidderSeat) return 'Only the bidder exchanges with the Kitty.'
+  if (cards.length !== state.nestPickedUp) return `Lay down exactly ${state.nestPickedUp} cards.`
+  if (new Set(cards).size !== cards.length) return 'A card is listed twice.'
+  const hand = state.hands[seat]
+  if (cards.some((c) => !hand.includes(c))) return 'You do not hold that card.'
+  if (!state.rules.discardPointsAllowed && cards.some((c) => cardPoints(c, state.rules) > 0)) {
+    return 'Point cards cannot go into the Kitty.'
+  }
+  return null
+}
+
+function applyDiscard(state: HandState, seat: number, cards: CardId[]): Result {
+  const problem = discardProblem(state, seat, cards)
+  if (problem) return fail(problem)
+  const hands = state.hands.map((h, i) => (i === seat ? h.filter((c) => !cards.includes(c)) : h))
+  return succeed({ ...state, hands, nest: [...cards], phase: 'trump', turnSeat: seat })
 }
 
 function applyOvershoot(state: HandState, seat: number, accept: boolean): Result {
@@ -317,6 +358,8 @@ export function applyAction(state: HandState, action: Action): Result {
       return applyBid(state, action.seat, action.bid)
     case 'overshoot':
       return applyOvershoot(state, action.seat, action.accept)
+    case 'discard':
+      return applyDiscard(state, action.seat, action.cards)
     case 'trump':
       return applyTrump(state, action.seat, action.trump)
     case 'play':
@@ -331,14 +374,17 @@ export function mustApply(state: HandState, action: Action): HandState {
   return r.state
 }
 
-/** The Kitty card everyone can see (null when the rules keep it hidden or it has been taken). */
+/** The Kitty card everyone can see while bidding (null once it is picked up or hidden by the rules). */
 export function exposedNestCard(state: HandState): CardId | null {
   if (!state.rules.nestTopExposed || state.nest.length === 0) return null
-  if (state.tricks.some((t) => t.tookNest)) return null
+  if (state.phase !== 'bidding' && state.phase !== 'overshoot') {
+    // Without a pickup the dealt Kitty stays on the table, still showing, until the last trick.
+    if (state.rules.bidderTakesNest || state.tricks.some((t) => t.tookNest)) return null
+  }
   return state.nest[0]
 }
 
 /** Number of tricks in a full hand. */
 export function totalTricks(state: HandState): number {
-  return state.hands.reduce((n, h) => n + h.length, 0) / state.handedness + state.tricks.length
+  return state.handSize
 }

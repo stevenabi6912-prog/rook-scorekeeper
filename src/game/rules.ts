@@ -19,7 +19,11 @@ export interface Rules {
   /** Point value of each rank (ranks not listed score 0). */
   points: Record<number, number>
   nestSize: number
-  /** Nobody picks the nest up; its points go to whoever wins the last trick. */
+  /** The bidder picks the nest up and lays the same number of cards back face down. */
+  bidderTakesNest: boolean
+  /** May point cards (and the Rook) be laid down into the nest? */
+  discardPointsAllowed: boolean
+  /** The (laid-down) nest's points go to whoever wins the last trick. */
   nestToLastTrick: boolean
   /** The top card of the nest is dealt face up so everyone sees it while bidding. */
   nestTopExposed: boolean
@@ -49,6 +53,9 @@ export const FAMILY_RULES: Rules = {
   rookPoints: 20,
   points: { 5: 5, 10: 10, 14: 10 },
   nestSize: 5,
+  bidderTakesNest: true,
+  // Open question for Steven: may point cards be laid down? Default yes.
+  discardPointsAllowed: true,
   nestToLastTrick: true,
   nestTopExposed: true,
   rookOnlyWhenVoid: true,

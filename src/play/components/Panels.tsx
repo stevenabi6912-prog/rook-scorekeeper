@@ -54,6 +54,21 @@ export function OvershootPanel({ shooter, onChoose }: { shooter: string; onChoos
   )
 }
 
+export function KittyPanel({ bid, picked, chosen, onLayDown }: { bid: string; picked: number; chosen: number; onLayDown: () => void }) {
+  const left = picked - chosen
+  return (
+    <div className="action-panel">
+      <div className="panel-title">
+        You won the bid at <strong>{bid}</strong> and picked up the Kitty.{' '}
+        {left > 0 ? <>Choose <strong>{left}</strong> more card{left === 1 ? '' : 's'} to lay down.</> : 'Lay those down face down?'}
+      </div>
+      <button type="button" className="btn primary block" disabled={left !== 0} onClick={onLayDown}>
+        Lay down {picked} cards
+      </button>
+    </div>
+  )
+}
+
 export function TrumpPanel({ onChoose }: { onChoose: (s: Suit) => void }) {
   return (
     <div className="action-panel">

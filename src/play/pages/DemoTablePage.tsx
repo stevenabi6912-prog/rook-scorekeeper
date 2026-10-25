@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { botBid, botPlay, botTrump } from '../../game/bots'
+import { botBid, botDiscard, botPlay, botTrump } from '../../game/bots'
 import type { CardId } from '../../game/cards'
 import { applyAction, legalBids, legalPlays, startHand, type Action, type BidAction, type HandState } from '../../game/engine'
 import { randomSeed, seededRng } from '../../game/rng'
@@ -8,7 +8,7 @@ import { FAMILY_RULES } from '../../game/rules'
 import { summarizeHand, tallies, toHandInput, type HandResult } from '../../game/score'
 import { scoreHand, teamsAtTarget, type HandOutcome, type Scores } from '../../lib/scoring'
 import type { Handedness, TeamId } from '../../lib/types'
-import { BidPanel, HandSummary, OvershootPanel, TrumpChip, TrumpPanel } from '../components/Panels'
+import { BidPanel, HandSummary, KittyPanel, OvershootPanel, TrumpChip, TrumpPanel } from '../components/Panels'
 import { HandFan } from '../components/Hand'
 import { SeatBadge, Table, type SeatInfo, type Sweep } from '../components/Table'
 import { isMuted, setMuted, sounds, unlockAudio } from '../sound'
@@ -83,7 +83,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
   const [handNumber, setHandNumber] = useState(1)
   const [totals, setTotals] = useState<Scores>({ A: 0, B: 0 })
   const [state, setState] = useState<HandState>(() => newHand(LAST))
-  const [selected, setSelected] = useState<CardId | null>(null)
+  const [selected, setSelected] = useState<CardId[]>([])
   const [sweep, setSweep] = useState<Sweep | null>(null)
   const [finished, setFinished] = useState<Finished | null>(null)
   const [muted, setMutedState] = useState(isMuted())
@@ -115,6 +115,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
         if (action.accept) sounds.moonBid()
         else sounds.pass()
       } else if (action.type === 'trump') sounds.trump()
+      else if (action.type === 'discard') sounds.trickSweep()
       else if (action.type === 'play') sounds.cardSlide()
       return r.state
     })
@@ -159,6 +160,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     const timer = setTimeout(() => {
       if (state.phase === 'bidding') act({ type: 'bid', seat, bid: botBid(state, seat, rng) })
       else if (state.phase === 'overshoot') act({ type: 'overshoot', seat, accept: rng() < 0.15 })
+      else if (state.phase === 'nest') act({ type: 'discard', seat, cards: botDiscard(state, seat) })
       else if (state.phase === 'trump') act({ type: 'trump', seat, trump: botTrump(state, seat) })
       else if (state.phase === 'playing') act({ type: 'play', seat, card: botPlay(state, seat, rng) })
     }, BOT_DELAY + rng() * 500)
@@ -195,10 +197,11 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     const tick = setInterval(() => setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000))), 250)
     const fire = setTimeout(() => {
       const s = stateRef.current
-      setSelected(null)
+      setSelected([])
       setToast('Time ran out. The table played for you.')
       if (s.phase === 'bidding') act({ type: 'bid', seat: ME, bid: botBid(s, ME, rng) })
       else if (s.phase === 'overshoot') act({ type: 'overshoot', seat: ME, accept: false })
+      else if (s.phase === 'nest') act({ type: 'discard', seat: ME, cards: botDiscard(s, ME) })
       else if (s.phase === 'trump') act({ type: 'trump', seat: ME, trump: botTrump(s, ME) })
       else if (s.phase === 'playing') act({ type: 'play', seat: ME, card: botPlay(s, ME, rng) })
     }, TURN_LIMIT_MS)
@@ -208,21 +211,32 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myTurn, decisionKey, act, rng])
-  const legal = state.phase === 'playing' && myTurn ? legalPlays(state, ME) : []
+  const exchanging = state.phase === 'nest' && myTurn
+  const legal = state.phase === 'playing' && myTurn ? legalPlays(state, ME) : exchanging ? state.hands[ME] : []
   const bidOptions: BidAction[] = state.phase === 'bidding' && myTurn ? legalBids(state, ME) : []
 
   const onSelect = (card: CardId) => {
     unlockAudio()
-    if (selected === card) {
-      setSelected(null)
+    if (exchanging) {
+      // Pick the cards to lay down; tap again to put one back.
+      setSelected((sel) => (sel.includes(card) ? sel.filter((c) => c !== card) : sel.length < state.nestPickedUp ? [...sel, card] : sel))
+      return
+    }
+    if (selected[0] === card) {
+      setSelected([])
       act({ type: 'play', seat: ME, card })
-    } else setSelected(card)
+    } else setSelected([card])
   }
   const playSelected = () => {
-    if (!selected) return
-    const card = selected
-    setSelected(null)
+    const card = selected[0]
+    if (!card) return
+    setSelected([])
     act({ type: 'play', seat: ME, card })
+  }
+  const layDown = () => {
+    const cards = selected
+    setSelected([])
+    act({ type: 'discard', seat: ME, cards })
   }
 
   const nextHand = () => {
@@ -240,7 +254,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     }
     seenTricks.current = 0
     setFinished(null)
-    setSelected(null)
+    setSelected([])
     sounds.deal()
   }
 
@@ -310,7 +324,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
               </span>
             )}
           </div>
-          {state.phase === 'playing' && myTurn && selected && (
+          {state.phase === 'playing' && myTurn && selected.length > 0 && (
             <button type="button" className="btn primary play-btn" onClick={playSelected}>Play</button>
           )}
         </div>
@@ -318,6 +332,9 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
         {state.phase === 'bidding' && myTurn && <BidPanel state={state} options={bidOptions} onBid={(b) => act({ type: 'bid', seat: ME, bid: b })} seats={SEATS} />}
         {state.phase === 'overshoot' && myTurn && (
           <OvershootPanel shooter={SEATS[state.bidding.highSeat!].name} onChoose={(accept) => act({ type: 'overshoot', seat: ME, accept })} />
+        )}
+        {exchanging && (
+          <KittyPanel bid={state.bid === 'moon' ? 'Moon' : String(state.bid)} picked={state.nestPickedUp} chosen={selected.length} onLayDown={layDown} />
         )}
         {state.phase === 'trump' && myTurn && <TrumpPanel onChoose={(t) => act({ type: 'trump', seat: ME, trump: t })} />}
 
@@ -327,7 +344,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
           legal={legal}
           selected={selected}
           onSelect={onSelect}
-          disabled={state.phase !== 'playing' || !myTurn}
+          disabled={!(state.phase === 'playing' || state.phase === 'nest') || !myTurn}
         />
       </div>
 
@@ -349,7 +366,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
   )
 }
 
-function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: CardId | null, seats: SeatInfo[]): string {
+function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: CardId[], seats: SeatInfo[]): string {
   if (state.phase === 'over') return 'Hand over'
   if (busy) return ''
   const who = seats[state.turnSeat].name
@@ -358,11 +375,13 @@ function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: 
       return myTurn ? 'Your bid' : `${who} is bidding…`
     case 'overshoot':
       return myTurn ? 'Overshoot?' : `${who} is deciding…`
+    case 'nest':
+      return myTurn ? 'Pick cards to lay down' : `${who} is sorting the Kitty…`
     case 'trump':
       return myTurn ? 'Name trump' : `${who} is picking trump…`
     case 'playing': {
       if (!myTurn) return `${who} is thinking…`
-      if (selected) return 'Tap again or press Play'
+      if (selected.length) return 'Tap again or press Play'
       const lead = state.trick.plays[0]
       if (!lead) return 'Your lead'
       return 'Your turn'
@@ -372,7 +391,9 @@ function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: 
 
 function bubblesFor(state: HandState, busy: boolean): Record<number, ReactNode> {
   const out: Record<number, ReactNode> = {}
-  if (state.phase === 'bidding' || state.phase === 'overshoot' || state.phase === 'trump') {
+  if (state.phase === 'nest' && state.bidderSeat !== null && state.turnSeat !== ME) {
+    out[state.bidderSeat] = '🃏 Kitty…'
+  } else if (state.phase === 'bidding' || state.phase === 'overshoot' || state.phase === 'trump') {
     const last = new Map<number, BidAction>()
     for (const c of state.bidding.calls) last.set(c.seat, c.bid)
     for (const [seat, b] of last) out[seat] = b === 'pass' ? 'Pass' : b === 'moon' ? '🌙 Moon' : String(b)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamId } from '../lib/types'
+import { botDiscard } from './bots'
 import { ROOK, type CardId } from './cards'
 import type { Deal } from './deal'
 import {
@@ -27,15 +28,20 @@ function fixed(hands: CardId[][], nest: CardId[] = [], dealerSeat = 3, rules: Ru
   return startHandFromDeal({ rules, handedness: 4, teams: TEAMS4, dealerSeat }, dealt)
 }
 
-/** Runs the bidding so that `bidderSeat` wins at `bid` and names `trump`. */
+/**
+ * Runs the bidding so that `bidderSeat` wins at `bid`, lays the picked-up
+ * Kitty straight back down (so hands stay as the test dealt them), and names `trump`.
+ */
 function throughBidding(state: HandState, bidderSeat: number, bid: number | 'moon', trump: 'red' | 'yellow' | 'green' | 'black') {
   let s = state
+  const kitty = state.nest
   // Everyone passes except the bidder, in turn order.
   while (s.phase === 'bidding') {
     const seat = s.turnSeat
     s = mustApply(s, { type: 'bid', seat, bid: seat === bidderSeat ? bid : 'pass' })
   }
   if (s.phase === 'overshoot') s = mustApply(s, { type: 'overshoot', seat: s.dealerSeat, accept: false })
+  if (s.phase === 'nest') s = mustApply(s, { type: 'discard', seat: bidderSeat, cards: kitty })
   expect(s.phase).toBe('trump')
   expect(s.bidderSeat).toBe(bidderSeat)
   return mustApply(s, { type: 'trump', seat: bidderSeat, trump })
@@ -55,12 +61,12 @@ describe('start of hand', () => {
     expect(totalTricks(s)).toBe(9)
   })
 
-  it('exposes the top Kitty card for everyone until the last trick takes it', () => {
+  it('exposes the top Kitty card for everyone while bidding, until the bidder picks it up', () => {
     const s = fixed([['R5'], ['R6'], ['R7'], ['R8']], ['Y10', ROOK, 'B6'])
     expect(exposedNestCard(s)).toBe('Y10')
     expect(exposedNestCard({ ...s, rules: { ...R, nestTopExposed: false } })).toBeNull()
     let t = throughBidding(s, 0, 65, 'green')
-    expect(exposedNestCard(t)).toBe('Y10')
+    expect(exposedNestCard(t)).toBeNull() // picked up and laid back face down
     t = mustApply(t, play(0, 'R5'))
     t = mustApply(t, play(1, 'R6'))
     t = mustApply(t, play(2, 'R7'))
@@ -212,6 +218,87 @@ describe('bidding', () => {
     s = mustApply(s, bid(0, 'moon'))
     expect(s.phase).toBe('trump')
     expect(s.bidderSeat).toBe(0)
+  })
+})
+
+describe('the Kitty exchange', () => {
+  const KITTY: CardId[] = ['Y10', ROOK, 'B6', 'B7', 'B8']
+  const dealt = () => fixed([['R5', 'R6', 'G14'], ['R7', 'Y5', 'G5'], ['R8', 'Y6', 'G6'], ['R9', 'Y7', 'G7']], KITTY)
+  const won = () => {
+    let s = dealt()
+    s = mustApply(s, bid(0, 80))
+    s = mustApply(s, bid(1, 'pass'))
+    s = mustApply(s, bid(2, 'pass'))
+    s = mustApply(s, bid(3, 'pass'))
+    return s
+  }
+
+  it('the bidder picks up the whole Kitty and must lay the same number back down', () => {
+    const s = won()
+    expect(s.phase).toBe('nest')
+    expect(s.turnSeat).toBe(0)
+    expect(s.hands[0]).toEqual(['R5', 'R6', 'G14', ...KITTY])
+    expect(s.hands[1]).toHaveLength(3)
+    expect(s.nest).toEqual([])
+    expect(s.nestPickedUp).toBe(5)
+    expect(s.rookHolderSeat).toBe(0) // the Rook came up in the Kitty
+    expect(applyAction(s, { type: 'trump', seat: 0, trump: 'red' }).ok).toBe(false)
+  })
+
+  it('rejects bad lay-downs', () => {
+    const s = won()
+    expect(applyAction(s, { type: 'discard', seat: 1, cards: ['R7', 'Y5', 'G5', 'R7', 'Y5'] }).ok).toBe(false)
+    expect(applyAction(s, { type: 'discard', seat: 0, cards: ['R5', 'R6'] })).toMatchObject({ ok: false, error: /exactly 5/ })
+    expect(applyAction(s, { type: 'discard', seat: 0, cards: ['R5', 'R5', 'R6', 'G14', 'Y10'] })).toMatchObject({ ok: false, error: /twice/ })
+    expect(applyAction(s, { type: 'discard', seat: 0, cards: ['R7', 'R5', 'R6', 'G14', 'Y10'] })).toMatchObject({ ok: false, error: /not hold/ })
+  })
+
+  it('after laying down, the hand is back to size, the Kitty is face down, and trump is next', () => {
+    let s = won()
+    s = mustApply(s, { type: 'discard', seat: 0, cards: ['B6', 'B7', 'B8', 'R5', 'Y10'] })
+    expect(s.phase).toBe('trump')
+    expect(s.hands[0]).toEqual(['R6', 'G14', ROOK])
+    expect(s.nest).toEqual(['B6', 'B7', 'B8', 'R5', 'Y10'])
+    expect(exposedNestCard(s)).toBeNull()
+    expect(totalTricks(s)).toBe(3)
+    // the laid-down points (R5 + Y10 = 15) go to whoever wins the last trick
+    s = mustApply(s, { type: 'trump', seat: 0, trump: 'green' })
+    const order = [0, 1, 2, 3]
+    for (const card of [['R6', 'R7', 'R8', 'R9'], ['G14', 'G5', 'G6', 'G7'], [ROOK, 'Y5', 'Y6', 'Y7']]) {
+      // winner of the previous trick leads; seats are arranged so seat 0's lead order holds for trick 1 only
+      let lead = s.turnSeat
+      for (let i = 0; i < 4; i++) {
+        const seat = order[(order.indexOf(lead) + i) % 4]
+        s = mustApply(s, play(seat, card[seat]))
+      }
+      lead = s.turnSeat
+    }
+    expect(s.phase).toBe('over')
+    const last = s.tricks[2]
+    expect(last.tookNest).toBe(true)
+    expect(last.winnerSeat).toBe(0)
+    expect(last.points).toBe(20 + 5 + 15) // Rook + Y5 in the trick, plus the Kitty
+  })
+
+  it('point cards can be kept out of the Kitty by rule', () => {
+    let s = fixed([['R5', 'R6', 'G14'], ['R7', 'Y5', 'G5'], ['R8', 'Y6', 'G6'], ['R9', 'Y7', 'G7']], KITTY, 3, { ...R, discardPointsAllowed: false })
+    s = mustApply(s, bid(0, 80))
+    s = mustApply(s, bid(1, 'pass'))
+    s = mustApply(s, bid(2, 'pass'))
+    s = mustApply(s, bid(3, 'pass'))
+    expect(applyAction(s, { type: 'discard', seat: 0, cards: ['B6', 'B7', 'B8', 'R5', 'R6'] })).toMatchObject({ ok: false, error: /Point cards/ })
+    expect(applyAction(s, { type: 'discard', seat: 0, cards: ['B6', 'B7', 'B8', 'R6', ROOK] }).ok).toBe(false)
+  })
+
+  it('without a pickup rule the Kitty stays on the table (variant)', () => {
+    let s = fixed([['R5'], ['R6'], ['R7'], ['R8']], KITTY, 3, { ...R, bidderTakesNest: false })
+    s = mustApply(s, bid(0, 65))
+    s = mustApply(s, bid(1, 'pass'))
+    s = mustApply(s, bid(2, 'pass'))
+    s = mustApply(s, bid(3, 'pass'))
+    expect(s.phase).toBe('trump')
+    expect(s.nest).toEqual(KITTY)
+    expect(s.hands[0]).toEqual(['R5'])
   })
 })
 
@@ -420,6 +507,7 @@ describe('playing a hand', () => {
         const options = legalBids(s, s.turnSeat)
         s = mustApply(s, bid(s.turnSeat, options[Math.floor(rng() * options.length)]))
       }
+      if (s.phase === 'nest') s = mustApply(s, { type: 'discard', seat: s.bidderSeat!, cards: botDiscard(s, s.bidderSeat!) })
       s = mustApply(s, { type: 'trump', seat: s.bidderSeat!, trump: 'red' })
       const tricks = totalTricks(s)
       while (s.phase === 'playing') {

@@ -188,14 +188,14 @@ each maps to a field in `src/game/rules.ts`.
 | 7 | Must follow suit if able; the Rook may only be played when void in the led color or when trump is led. | `rookOnlyWhenVoid: true` |
 | 8 | Rook led counts as a trump lead; others must play trump if able. | built in |
 | 9 | Nest is 5 cards, 4- or 6-handed. | `nestSize: 5` |
-| 10, 11, 12 | **Nobody picks up the Kitty.** It stays on the table and its points go to the team that wins the last trick. No discarding. **The top card of the Kitty is dealt face up** so everyone sees it while bidding (Steven, 2026-10-25); it stays visible until the last trick takes the Kitty. | `nestToLastTrick: true`, `nestTopExposed: true`, no nest phase |
+| 10, 11, 12 | **Corrected by Steven later the same day:** the winning bidder **picks up all 5 Kitty cards**, then lays any 5 cards from their hand face down as the new Kitty. That face-down pile goes to the team that wins the last trick. **The top card of the Kitty is dealt face up** so everyone sees it while bidding; it goes into the bidder's hand with the rest. **Open question:** may point cards (or the Rook) be laid down? Engine default: yes, anything may be laid down. | `bidderTakesNest: true`, `discardPointsAllowed: true`, `nestToLastTrick: true`, `nestTopExposed: true`, phase `nest` |
 | 13–17 | Bidding starts left of dealer, clockwise; a pass is final; if everyone passes the dealer takes it at 65; dealer bids in turn. **Jump bids are allowed**: the opening bid can be any multiple of 5 from 65 up (80, say) and any later bid can jump by more than 5 (80 to 90, or 80 to 120). | `legalBids` |
 | 17b | **Moon may only be a player's first call.** Once you have bid a number you cannot shoot later in the auction. (Steven, 2026-10-25.) | `moonOnlyAsFirstBid: true` |
 | 18 | **Moon means the bidding team must take every trick.** | `moonRequiresAllTricks: true` |
 | 19 | Partner plays normally on a Moon. | built in |
 | 20 | Nest still goes to the last trick on a Moon (so the shooting team collects it by taking every trick). | built in |
 | 21, 27 | No early stop. Every card is played even when a Moon is already lost. | `stopEarlyOnBrokenMoon: false` |
-| 22 | Bidder names trump before the first lead (there is no nest exchange, so this is right after bidding). | phase `trump` |
+| 22 | Bidder names trump after laying down the Kitty, before the first lead. | phase `trump` |
 | 23 | Bidder leads the first trick. | built in |
 | 24, 25 | Must follow the led color; if void, anything. Highest trump wins, else highest of the led color. | `trick.ts` |
 | 26 | No last-trick bonus beyond the nest. | built in |
@@ -294,7 +294,7 @@ gate. New routes:
 | Route | Screen |
 | --- | --- |
 | `/play` | Lobby: open tables for this family, "new table" |
-| `/play/:matchId` | The table: seat claiming, then bidding, trump, trick play, hand summary, driven by match phase |
+| `/play/:matchId` | The table: seat claiming, then bidding, Kitty exchange, trump, trick play, hand summary, driven by match phase |
 | `/play/demo` | Single-phone demo against simple bots (local store only), used to build the UI before multiplayer exists |
 
 A match is linked to a normal scorekeeper `Game`. Creating a table either
@@ -314,7 +314,7 @@ src/game/            pure engine, no React, no Firebase, fully unit tested
   deal.ts            seeded shuffle (so a deal can be reproduced in tests), deal into seats + nest
   bidding.ts         bidding state machine
   trick.ts           legal plays, trick winner with Rook rules
-  hand.ts            full hand state machine: deal -> bid (with overshoot) -> trump -> play -> scored
+  hand.ts            full hand state machine: deal -> bid (with overshoot) -> Kitty exchange -> trump -> play -> scored
   score.ts           points taken per team from tricks + discards, Moon early-exit, builds a scorekeeper HandInput
   bots.ts            simple legal-move bots for the demo table
   index.ts
@@ -340,7 +340,7 @@ New subcollections under the family. Nothing existing is modified.
 ```
 families/{code}/matches/{matchId}                     public table state
 families/{code}/matches/{matchId}/seats/{seatIndex}   PRIVATE: that seat's cards
-families/{code}/matches/{matchId}/nest/current        PRIVATE: nest cards (nobody until the hand is over)
+families/{code}/matches/{matchId}/nest/current        PRIVATE: the Kitty (bidder reads it to pick up; face-down lay-down until the hand is over)
 families/{code}/matches/{matchId}/hands/{n}           archive of each finished hand's plays (public, written at hand end)
 families/{code}/matches/{matchId}/messages/{msgId}    table chat: players' messages, reactions and game events
 ```
@@ -363,7 +363,7 @@ interface Match {
   }>
   handNumber: number
   dealerSeat: number
-  phase: 'seating' | 'dealing' | 'bidding' | 'overshoot' | 'trump' | 'playing' | 'handOver' | 'finished'
+  phase: 'seating' | 'dealing' | 'bidding' | 'overshoot' | 'nest' | 'trump' | 'playing' | 'handOver' | 'finished'
   dealSeed?: string              // see 3.5
   bidding: {
     turnSeat: number
@@ -392,8 +392,10 @@ Written by the dealer when dealing (see 3.5) and by the seat's owner as cards
 are played and discarded.
 
 **Nest document** `nest/current` (private): `{ cards: string[] }`. Written by
-the dealer; readable by everyone only once `phase` is `handOver`, when its
-points are added to the last trick.
+the dealer at the deal. Readable by the bidder once bidding closes (to pick
+the Kitty up), rewritten by the bidder with the laid-down cards, and readable
+by everyone once `phase` is `handOver`, when its points are added to the last
+trick. The face-up top card is copied to `kittyTop` on the public match doc.
 
 **Message document** `messages/{msgId}`:
 `{ uid, playerId, kind: 'text' | 'reaction' | 'event', text, createdAt }`.
@@ -561,8 +563,10 @@ match /families/{code}/matches/{matchId} {
       || matchDoc().seats[int(seatIndex)].uid == request.auth.uid);
   }
   match /nest/current {
-    allow read: if signedIn() && validCode(code) && matchDoc().phase in ['handOver', 'finished'];
-    allow write: if (dealer during 'dealing');
+    allow read: if signedIn() && validCode(code) && (
+      matchDoc().phase in ['handOver', 'finished']
+      || (matchDoc().bidderSeat != null && matchDoc().seats[matchDoc().bidderSeat].uid == request.auth.uid));
+    allow write: if (dealer during 'dealing') || (bidder during 'nest', writing exactly nestSize cards);
   }
   match /hands/{n} {
     allow read: if signedIn() && validCode(code);
