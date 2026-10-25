@@ -21,6 +21,8 @@ export interface Rules {
   nestSize: number
   /** Nobody picks the nest up; its points go to whoever wins the last trick. */
   nestToLastTrick: boolean
+  /** The top card of the nest is dealt face up so everyone sees it while bidding. */
+  nestTopExposed: boolean
   /** The Rook may only be played when void in the led color (or when trump is led). */
   rookOnlyWhenVoid: boolean
   minBid: number
@@ -48,6 +50,7 @@ export const FAMILY_RULES: Rules = {
   points: { 5: 5, 10: 10, 14: 10 },
   nestSize: 5,
   nestToLastTrick: true,
+  nestTopExposed: true,
   rookOnlyWhenVoid: true,
   minBid: 65,
   maxBid: 120,

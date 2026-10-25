@@ -331,6 +331,13 @@ export function mustApply(state: HandState, action: Action): HandState {
   return r.state
 }
 
+/** The Kitty card everyone can see (null when the rules keep it hidden or it has been taken). */
+export function exposedNestCard(state: HandState): CardId | null {
+  if (!state.rules.nestTopExposed || state.nest.length === 0) return null
+  if (state.tricks.some((t) => t.tookNest)) return null
+  return state.nest[0]
+}
+
 /** Number of tricks in a full hand. */
 export function totalTricks(state: HandState): number {
   return state.hands.reduce((n, h) => n + h.length, 0) / state.handedness + state.tricks.length

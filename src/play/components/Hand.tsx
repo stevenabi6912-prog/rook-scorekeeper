@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { sortHand, type CardId } from '../../game/cards'
+import { effectiveSuit, sortHand, type CardId } from '../../game/cards'
 import { FAMILY_RULES, type Suit } from '../../game/rules'
-import { Card } from './Card'
+import { CARD_INK, Card } from './Card'
 
 interface HandProps {
   cards: CardId[]
@@ -46,11 +46,18 @@ export function HandFan({ cards, trump, legal, selected, onSelect, disabled }: H
         const lift = Math.abs(i - mid) * Math.min(2.2, 16 / n)
         const isSelected = selected === id
         const playable = legalSet.has(id) && !disabled
+        const isTrump = trump !== null && effectiveSuit(id, trump) === trump
         return (
           <div
             key={id}
-            className={`hand-slot${isSelected ? ' selected' : ''}`}
-            style={{ left: left0 + i * step, top: 14 + lift, zIndex: isSelected ? 50 : i, transform: `rotate(${rot}deg)` }}
+            className={`hand-slot${isSelected ? ' selected' : ''}${isTrump ? ' trump' : ''}`}
+            style={{
+              left: left0 + i * step,
+              top: 14 + lift,
+              zIndex: isSelected ? 50 : i,
+              transform: `rotate(${rot}deg)`,
+              ...(isTrump && trump ? { ['--trump' as string]: CARD_INK[trump] } : {}),
+            }}
           >
             <Card
               id={id}

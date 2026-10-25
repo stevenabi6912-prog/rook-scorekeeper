@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { TeamId } from '../../lib/types'
 import type { CardId } from '../../game/cards'
-import type { HandState, TakenTrick } from '../../game/engine'
-import { Card, CardStack } from './Card'
+import { exposedNestCard, type HandState, type TakenTrick } from '../../game/engine'
+import { CARD_INK, Card, CardStack, cardLabel } from './Card'
 
 export interface SeatInfo {
   name: string
@@ -58,14 +58,21 @@ export function Table({ state, me, seats, bubbles, sweep }: TableProps) {
   const rel = (seat: number) => (seat - me + n) % n
   const { ref, size } = useSize()
   const cardW = Math.max(54, Math.min(84, Math.floor(size.w / 5)))
+  const exposed = exposedNestCard(state)
 
   const plays: { seat: number; card: CardId; key: string }[] = sweep
     ? sweep.trick.plays.map((p) => ({ ...p, key: `sweep-${p.card}` }))
     : state.trick.plays.map((p) => ({ ...p, key: `trick-${p.card}` }))
 
   return (
-    <div className="table-area" ref={ref}>
-      <div className="felt-edge" aria-hidden />
+    <div className="table-area" ref={ref} style={state.trump ? { ['--trump' as string]: CARD_INK[state.trump] } : undefined}>
+      <div className={`felt-edge${state.trump ? ' has-trump' : ''}`} aria-hidden />
+      {state.trump && (
+        <div className="trump-marker" aria-label={`${state.trump} is trump`}>
+          <span className="trump-swatch" style={{ background: CARD_INK[state.trump] }} />
+          <span>{state.trump} trump</span>
+        </div>
+      )}
       {seats.map((info, seat) => {
         const k = rel(seat)
         if (k === 0) return null
@@ -86,8 +93,8 @@ export function Table({ state, me, seats, bubbles, sweep }: TableProps) {
 
       {/* Kitty in the middle until the last trick takes it */}
       {state.nest.length > 0 && !state.tricks.some((t) => t.tookNest) && plays.length === 0 && (
-        <div className="kitty" aria-label={`Kitty, ${state.nest.length} cards`}>
-          <CardStack count={state.nest.length} width={Math.round(cardW * 0.38)} />
+        <div className="kitty" aria-label={`Kitty, ${state.nest.length} cards${exposed ? `, ${cardLabel(exposed)} showing` : ''}`}>
+          <CardStack count={state.nest.length} width={Math.round(cardW * (exposed ? 0.6 : 0.38))} topCard={exposed} />
           <span className="kitty-label">Kitty</span>
         </div>
       )}

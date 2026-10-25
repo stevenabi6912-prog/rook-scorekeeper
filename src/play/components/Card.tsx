@@ -181,14 +181,15 @@ export function Card({ id, width, faceDown, selected, dimmed, onClick, className
   )
 }
 
-/** A small stack of card backs, for other players' hands. */
-export function CardStack({ count, width }: { count: number; width: number }) {
+/** A small stack of card backs, for other players' hands and the Kitty. `topCard` shows face up on top. */
+export function CardStack({ count, width, topCard }: { count: number; width: number; topCard?: CardId | null }) {
   const n = Math.min(count, 5)
   return (
     <div className="card-stack" style={{ width: width + n * 3, height: Math.round(width * CARD_RATIO) + n * 2 }} aria-label={`${count} cards`}>
-      {Array.from({ length: n }, (_, i) => (
-        <Card key={i} id={ROOK} width={width} faceDown style={{ position: 'absolute', left: i * 3, top: i * 2 }} />
-      ))}
+      {Array.from({ length: n }, (_, i) => {
+        const top = i === n - 1 && topCard
+        return <Card key={i} id={top ? topCard : ROOK} width={width} faceDown={!top} style={{ position: 'absolute', left: i * 3, top: i * 2 }} />
+      })}
       <span className="card-stack-count">{count}</span>
     </div>
   )

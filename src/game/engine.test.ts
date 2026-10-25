@@ -4,6 +4,7 @@ import { ROOK, type CardId } from './cards'
 import type { Deal } from './deal'
 import {
   applyAction,
+  exposedNestCard,
   legalBids,
   legalPlays,
   mustApply,
@@ -52,6 +53,21 @@ describe('start of hand', () => {
     const holder = s.hands.findIndex((h) => h.includes(ROOK))
     expect(s.rookHolderSeat).toBe(holder === -1 ? null : holder)
     expect(totalTricks(s)).toBe(9)
+  })
+
+  it('exposes the top Kitty card for everyone until the last trick takes it', () => {
+    const s = fixed([['R5'], ['R6'], ['R7'], ['R8']], ['Y10', ROOK, 'B6'])
+    expect(exposedNestCard(s)).toBe('Y10')
+    expect(exposedNestCard({ ...s, rules: { ...R, nestTopExposed: false } })).toBeNull()
+    let t = throughBidding(s, 0, 65, 'green')
+    expect(exposedNestCard(t)).toBe('Y10')
+    t = mustApply(t, play(0, 'R5'))
+    t = mustApply(t, play(1, 'R6'))
+    t = mustApply(t, play(2, 'R7'))
+    t = mustApply(t, play(3, 'R8'))
+    expect(t.phase).toBe('over')
+    expect(exposedNestCard(t)).toBeNull()
+    expect(t.tricks[0].points).toBe(5 + 30) // the whole Kitty, exposed card included, went to the last trick
   })
 
   it('Rook in the nest means no holder', () => {

@@ -4,6 +4,7 @@ import type { HandResult } from '../../game/score'
 import { type Suit } from '../../game/rules'
 import type { HandOutcome } from '../../lib/scoring'
 import type { TeamId } from '../../lib/types'
+import { CARD_INK } from './Card'
 import type { SeatInfo } from './Table'
 
 export function BidPanel({
@@ -121,8 +122,8 @@ export function HandSummary({
 export function TrumpChip({ trump }: { trump: Suit | null }) {
   if (!trump) return <span className="top-chip muted-chip">Trump ?</span>
   return (
-    <span className="top-chip">
-      <TrumpDot trump={trump} /> {trump[0].toUpperCase() + trump.slice(1)}
+    <span className="top-chip trump-pill" style={{ background: CARD_INK[trump] }}>
+      <TrumpDot trump={trump} /> {trump.toUpperCase()} TRUMP
     </span>
   )
 }

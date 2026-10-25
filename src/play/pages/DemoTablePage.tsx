@@ -54,6 +54,8 @@ function tableConfig(handedness: Handedness, autopilot: boolean): TableConfig {
 }
 
 const BOT_DELAY = 750
+/** A person gets this long per decision; then the table picks for them. */
+const TURN_LIMIT_MS = 30_000
 const REST_MS = 900
 const SWEEP_MS = 450
 
@@ -86,7 +88,10 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
   const [finished, setFinished] = useState<Finished | null>(null)
   const [muted, setMutedState] = useState(isMuted())
   const [toast, setToast] = useState<string | null>(null)
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const seenTricks = useRef(0)
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   function newHand(dealer: number): HandState {
     return startHand({ rules: FAMILY_RULES, handedness: HANDEDNESS, teams: TEAMS, dealerSeat: dealer, seed: randomSeed() })
@@ -177,6 +182,32 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
   }, [toast])
 
   const myTurn = !busy && !AUTOPILOT && state.turnSeat === ME && state.phase !== 'over'
+
+  // 30-second clock on my decisions; when it runs out the bot logic picks for me.
+  const decisionKey = `${state.phase}:${state.tricks.length}:${state.trick.plays.length}:${state.bidding.calls.length}`
+  useEffect(() => {
+    if (!myTurn) {
+      setSecondsLeft(null)
+      return
+    }
+    const deadline = Date.now() + TURN_LIMIT_MS
+    setSecondsLeft(TURN_LIMIT_MS / 1000)
+    const tick = setInterval(() => setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000))), 250)
+    const fire = setTimeout(() => {
+      const s = stateRef.current
+      setSelected(null)
+      setToast('Time ran out. The table played for you.')
+      if (s.phase === 'bidding') act({ type: 'bid', seat: ME, bid: botBid(s, ME, rng) })
+      else if (s.phase === 'overshoot') act({ type: 'overshoot', seat: ME, accept: false })
+      else if (s.phase === 'trump') act({ type: 'trump', seat: ME, trump: botTrump(s, ME) })
+      else if (s.phase === 'playing') act({ type: 'play', seat: ME, card: botPlay(s, ME, rng) })
+    }, TURN_LIMIT_MS)
+    return () => {
+      clearInterval(tick)
+      clearTimeout(fire)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTurn, decisionKey, act, rng])
   const legal = state.phase === 'playing' && myTurn ? legalPlays(state, ME) : []
   const bidOptions: BidAction[] = state.phase === 'bidding' && myTurn ? legalBids(state, ME) : []
 
@@ -258,6 +289,11 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
 
       <Table state={state} me={ME} seats={SEATS} bubbles={bubbles} sweep={sweep} />
 
+      {myTurn && secondsLeft !== null && (
+        <div className="turn-bar" aria-hidden>
+          <div className={secondsLeft <= 10 ? 'urgent' : ''} style={{ width: `${(secondsLeft / (TURN_LIMIT_MS / 1000)) * 100}%` }} />
+        </div>
+      )}
       <div className="live-tally" aria-label="Points this hand">
         <span className="team-A">{TEAM_NAMES.A} {live.points.A}</span>
         <span className="team-B">{TEAM_NAMES.B} {live.points.B}</span>
@@ -266,7 +302,14 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
       <div className="my-area">
         <div className="my-row">
           <SeatBadge info={SEATS[ME]} dealer={state.dealerSeat === ME} bidder={state.bidderSeat === ME} turn={myTurn} size="lg" />
-          <div className="my-status">{status}</div>
+          <div className="my-status">
+            {status}
+            {myTurn && secondsLeft !== null && (
+              <span className={`turn-clock${secondsLeft <= 10 ? ' urgent' : ''}`} aria-label={`${secondsLeft} seconds left`}>
+                {secondsLeft}s
+              </span>
+            )}
+          </div>
           {state.phase === 'playing' && myTurn && selected && (
             <button type="button" className="btn primary play-btn" onClick={playSelected}>Play</button>
           )}

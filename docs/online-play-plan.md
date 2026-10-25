@@ -188,7 +188,7 @@ each maps to a field in `src/game/rules.ts`.
 | 7 | Must follow suit if able; the Rook may only be played when void in the led color or when trump is led. | `rookOnlyWhenVoid: true` |
 | 8 | Rook led counts as a trump lead; others must play trump if able. | built in |
 | 9 | Nest is 5 cards, 4- or 6-handed. | `nestSize: 5` |
-| 10, 11, 12 | **Nobody picks up the nest.** It stays face down and its points go to the team that wins the last trick. No discarding. | `nestToLastTrick: true`, no nest phase |
+| 10, 11, 12 | **Nobody picks up the Kitty.** It stays on the table and its points go to the team that wins the last trick. No discarding. **The top card of the Kitty is dealt face up** so everyone sees it while bidding (Steven, 2026-10-25); it stays visible until the last trick takes the Kitty. | `nestToLastTrick: true`, `nestTopExposed: true`, no nest phase |
 | 13–17 | Bidding starts left of dealer, clockwise; a pass is final; if everyone passes the dealer takes it at 65; dealer bids in turn. **Jump bids are allowed**: the opening bid can be any multiple of 5 from 65 up (80, say) and any later bid can jump by more than 5 (80 to 90, or 80 to 120). | `legalBids` |
 | 17b | **Moon may only be a player's first call.** Once you have bid a number you cannot shoot later in the auction. (Steven, 2026-10-25.) | `moonOnlyAsFirstBid: true` |
 | 18 | **Moon means the bidding team must take every trick.** | `moonRequiresAllTricks: true` |
@@ -375,6 +375,8 @@ interface Match {
   bid: number | 'moon' | null
   trump: Trump | null
   turnSeat: number               // whose move, in every phase
+  turnStartedAt: number          // for the 30-second clock (3.9)
+  kittyTop: string | null        // the face-up Kitty card everyone can see
   trick: { leadSeat: number; plays: Array<{ seat: number; card: string }> }
   tricksTaken: Array<{ winnerSeat: number; cards: string[]; points: number }>
   pointsTaken: { A: number; B: number }   // running, from completed tricks only
@@ -608,13 +610,20 @@ it stays as a practice mode afterwards.
 - **Phone dies mid-move:** nothing is lost; the match doc is the only truth.
   The only client-side follow-up write is the scorekeeper hand (3.6), which
   is retried by whoever loads next.
-- **Timeouts:** with no server there is no clock that fires when nobody is
-  looking. What is practical: every phone shows whose turn it is and how long
-  they have been thinking; after a configurable idle time a "nudge" shows on
-  that player's phone (and vibrates); the host can "take over" an absent seat
-  (reassign its uid to the host phone, which then shows a seat switcher).
-  Auto-play by bots for an absent human is possible later using the same
-  takeover path.
+- **Timeouts (30 seconds per decision, Steven's rule):** every decision a
+  person has to make (bid, overshoot, trump, play) gets a visible 30-second
+  clock. When it runs out, that player's own phone picks for them using the
+  bot logic (the best legal card by the same heuristics the bots use) and
+  commits the move, with a note that the table played for them. The
+  practice table already does this.
+  If their phone is closed or offline it cannot move for them, so the match
+  doc records `turnStartedAt` on every move and the rules let **any seated
+  player** read the stalled seat's cards and play for it once
+  `request.time` is more than 30 seconds past `turnStartedAt`. The host's
+  phone does this automatically (it already moves the bots), so a game never
+  waits on an absent person for more than about half a minute. Everyone sees
+  "The table played for June". The seat keeps its uid; when the person
+  comes back they simply continue.
 - **Abandon:** the host can end a match; the linked game stays with whatever
   hands were recorded, exactly as if the family had stopped a paper game.
 
