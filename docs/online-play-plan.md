@@ -220,6 +220,17 @@ What I propose:
   work offline. A mute toggle lives on the table screen; the setting is
   remembered per phone. Mobile browsers only allow audio after a tap, so the
   first tap on the table unlocks it silently.
+- **Table chat.** A chat button on the table opens a slide-up panel over the
+  bottom of the screen (your hand stays visible above it). Messages show the
+  sender's avatar and name in their team color, and the newest message also
+  pops up briefly as a bubble next to that player's seat so you can keep
+  playing without opening the panel. A row of quick taps ("nice", "ouch",
+  "hurry up", a laugh, a Rook bird) sends a reaction with one touch. An
+  unread badge sits on the chat button, with the short message sound from the
+  set above. Game events ("Abi bid 85", "Steven named green trump", "Team A
+  takes the trick with the Rook") appear in the same stream in a muted style
+  so the chat doubles as the hand's log. Table talk about your cards is the
+  family's business, not the app's; nothing is filtered.
 
 **Q30. Graphics preferences.** Anything you have in mind? For example: a
 particular Rook deck's look you grew up with (the classic Parker Brothers
@@ -233,6 +244,10 @@ or playful (synthesized, game-like tones)? Default: realistic card sounds
 with a few playful musical cues for bids, trump, Moon and your turn. Should
 sound be on by default when someone opens the table, or off until they tap
 the speaker? Default: on, with the mute toggle remembered.
+
+**Q32. Chat.** Free text plus quick reactions is the default. Do you also
+want voice notes (short recorded clips; these need Firebase Storage, which is
+on the free plan), or is text enough? Default: text and reactions only.
 
 ---
 
@@ -276,7 +291,7 @@ src/play/            data layer and UI for online play
   localMatchStore.ts single-device implementation (demo mode and tests)
   firestoreMatchStore.ts
   hooks.ts           useMatch, useMySeat, useMyHand
-  components/        Card, Hand (fan), Table, TrickPile, BidDial, NestTray, SeatBadge, HandSummary
+  components/        Card, Hand (fan), Table, TrickPile, BidDial, NestTray, SeatBadge, HandSummary, ChatPanel, SpeechBubble
   pages/             PlayLobbyPage, TablePage, DemoTablePage
 ```
 
@@ -295,6 +310,7 @@ families/{code}/matches/{matchId}                     public table state
 families/{code}/matches/{matchId}/seats/{seatIndex}   PRIVATE: that seat's cards
 families/{code}/matches/{matchId}/nest/current        PRIVATE: nest cards (bidder only)
 families/{code}/matches/{matchId}/hands/{n}           archive of each finished hand's plays (public, written at hand end)
+families/{code}/matches/{matchId}/messages/{msgId}    table chat: players' messages, reactions and game events
 ```
 
 **Match document** (public, everyone at the table reads it):
@@ -342,6 +358,14 @@ are played and discarded.
 
 **Nest document** `nest/current` (private): `{ cards: string[]; discards: string[] }`.
 Written by the dealer; readable only by the current bidder once bidding ends.
+
+**Message document** `messages/{msgId}`:
+`{ uid, playerId, kind: 'text' | 'reaction' | 'event', text, createdAt }`.
+Players write `text` and `reaction` messages for themselves; `event`
+messages are written by the client that commits the move they describe, in
+the same batch as the move. The table subscribes to the latest 100 messages
+ordered by `createdAt`; older ones stay in Firestore but are not loaded.
+Messages are deleted with the match when the host ends it.
 
 Per-hand archive `hands/{n}` is written once at hand end by the resolving
 client. It holds the bids, trump, every trick, and the discards, so a hand can
@@ -483,6 +507,17 @@ match /families/{code}/matches/{matchId} {
     allow create: if signedIn() && seated player;
     allow update, delete: if false;
   }
+  match /messages/{msgId} {
+    allow read: if signedIn() && validCode(code);
+    // Anyone seated may post as themselves; text capped at 500 chars.
+    allow create: if signedIn() && seated player
+      && request.resource.data.uid == request.auth.uid
+      && request.resource.data.kind in ['text', 'reaction', 'event']
+      && request.resource.data.text is string
+      && request.resource.data.text.size() <= 500;
+    allow update: if false;
+    allow delete: if isHost();
+  }
 }
 ```
 
@@ -498,7 +533,8 @@ console yourself, as the README describes.
 ### 3.8 Local demo store
 
 `localMatchStore.ts` implements the same `MatchStore` interface in memory for
-the demo table and for tests. In demo mode all seats belong to the one phone,
+the demo table and for tests, chat included (the bots answer with canned
+lines so the panel can be built and styled offline). In demo mode all seats belong to the one phone,
 and `bots.ts` plays the other three seats with simple legal moves (follow
 suit, win cheaply, dump points on partner's winning trick). This is how the
 whole UI gets built and polished before a single Firestore rule changes, and
@@ -536,7 +572,7 @@ questionnaire is answered. Each phase lands as small commits on
 | 1 | **Engine** in `src/game/` with unit tests: deck per handedness, seeded deal, bidding, nest and discards, trump, legal plays, trick winner with Rook rules, points, Moon early-exit, conversion to scorekeeper `HandInput` | 1–2 sessions | Tests cover every rule in section 1, including the odd cases (Rook led, Rook when not void, everyone passes, Moon broken on a discard) |
 | 2 | **Card graphics, sound and table** (section 2): `Card` SVG, hand fan, table, trick animation, bid dial, nest tray, sound set with mute; demo table at `/play/demo` against bots using the local store | 2–3 sessions | **First demo milestone:** you can open the app on your phone, tap Play, and play a full hand of Rook against bots with nice cards. Nothing online yet. |
 | 3 | **Data layer**: `MatchStore` interface, local implementation, Firestore implementation, dealer, transactions, draft rules | 1–2 sessions | Two browser tabs on the dev server play against each other through Firestore (emulator or the real project under a test passcode) |
-| 4 | **Multi-phone UI**: lobby, table creation from a game, seat claiming, rejoin, turn indicators, hand summary | 1–2 sessions | **Second milestone:** four phones on the family passcode play a full hand |
+| 4 | **Multi-phone UI**: lobby, table creation from a game, seat claiming, rejoin, turn indicators, hand summary, chat panel with reactions and event log | 1–2 sessions | **Second milestone:** four phones on the family passcode play a full hand |
 | 5 | **Wire to scorekeeper and polish**: write hands to the game, finish at 500, Rook holder, host controls, nudge, concede | 1 session | A full game played online appears in history and stats like any paper game |
 | 6 | Publish rules and merge | when you say | Rules diff reviewed by you, pasted into the console; branch merged |
 
