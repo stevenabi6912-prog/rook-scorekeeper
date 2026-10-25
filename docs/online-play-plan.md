@@ -653,6 +653,41 @@ cancel like a messaging app.
 
 ---
 
+## 3.11 What was actually built (2026-10-25, branch `online-play`)
+
+The data layer and online table exist and are verified end to end **in demo
+mode** (the in-browser store), on one phone holding one seat with three bots:
+lobby → new table from a game → seat claiming → bots → deal → bidding → Kitty
+exchange → play → claim → summary → hand written to the scorekeeper → next
+hand with the dealer rotated. Differences from the design above, decided
+while building:
+
+- **The host's phone deals every hand** (not a rotating dealer device). It
+  already moves the bots and plays for absent people, so it is the one phone
+  that has to be present anyway. The seed is still published (`dealSeed`).
+- **Every rule runs on public information plus the mover's own cards.** Other
+  seats' cards are `UNKNOWN` placeholders in the engine. The Kitty's points on
+  the last trick fall out of the deck total (120 minus every played card), so
+  no phone ever reads another seat's cards or the laid-down Kitty.
+- **Throwing the cards in** is checked against every *unseen* card, so it
+  needs no confirmation round from the other phones.
+- **Picking up the Kitty** is its own engine action, because only the bidder's
+  phone may read the Kitty document.
+- The table is linked to a scorekeeper game; `firstHandNumber` records where
+  the table's hands start when the game already had hands.
+- `?auto` on a table URL lets this phone's seat be played by the bot logic
+  (watching, testing).
+
+**Not yet verified:** the Firestore implementation against the real project.
+The draft rules are in `firestore.rules` on the branch and have **not been
+published**; until they are, the live app cannot create or read matches
+(the scorekeeper is unaffected either way). Publishing is a copy-paste in the
+Firebase console, as the README describes, once Steven has read the diff.
+The rules have also not been run through the emulator; expect a round of
+fixes on first use.
+
+---
+
 ## 4. Build order and effort
 
 Effort is in focused working sessions of a few hours each, assuming the
