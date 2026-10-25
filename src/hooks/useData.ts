@@ -60,9 +60,11 @@ export function useHands(gameId: string | undefined) {
 export function useAllHands(games: Game[] | null) {
   const store = useStore()
   const [handsByGame, setHandsByGame] = useState<Record<string, Hand[]> | null>(null)
-  const key = useMemo(() => (games ?? []).map((g) => `${g.id}:${g.status}`).join(','), [games])
+  // null while games are still loading; a distinct string once loaded, even
+  // when the list is empty, so the effect runs and the spinner clears.
+  const key = useMemo(() => (games ? 'loaded:' + games.map((g) => `${g.id}:${g.status}`).join(',') : null), [games])
   useEffect(() => {
-    if (!games) return
+    if (key === null || !games) return
     let cancelled = false
     Promise.all(games.map(async (g) => [g.id, await store.getHands(g.id)] as const))
       .then((entries) => {
