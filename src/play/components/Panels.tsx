@@ -79,7 +79,7 @@ export function TrumpPanel({ onChoose }: { onChoose: (s: Suit) => void }) {
 }
 
 export function HandSummary({
-  result, outcome, bidderName, seats, totalsBefore, teamNames, gameOver, onNext,
+  result, outcome, bidderName, seats, totalsBefore, teamNames, gameOver, onNext, waitingFor,
 }: {
   result: HandResult
   outcome: HandOutcome
@@ -88,7 +88,9 @@ export function HandSummary({
   totalsBefore: Record<TeamId, number>
   teamNames: Record<TeamId, string>
   gameOver: TeamId | null
-  onNext: () => void
+  /** Absent when someone else advances the table. */
+  onNext?: () => void
+  waitingFor?: string
 }) {
   const bt = result.bidTeam
   const ot: TeamId = bt === 'A' ? 'B' : 'A'
@@ -122,13 +124,11 @@ export function HandSummary({
             <span key={i} className={`badge team-${s.team}`}>{s.name}</span>
           ))}
         </div>
-        {gameOver ? (
-          <>
-            <div className="summary-headline" style={{ marginTop: 12 }}>🏆 {teamNames[gameOver]} win the game!</div>
-            <button type="button" className="btn primary big block" onClick={onNext}>New game</button>
-          </>
+        {gameOver && <div className="summary-headline" style={{ marginTop: 12 }}>🏆 {teamNames[gameOver]} win the game!</div>}
+        {onNext ? (
+          <button type="button" className="btn primary big block" onClick={onNext}>{gameOver ? 'New game' : 'Next hand'}</button>
         ) : (
-          <button type="button" className="btn primary big block" onClick={onNext}>Next hand</button>
+          <div className="muted center small" style={{ padding: 8 }}>{waitingFor ?? 'Waiting for the next hand…'}</div>
         )}
       </div>
     </div>

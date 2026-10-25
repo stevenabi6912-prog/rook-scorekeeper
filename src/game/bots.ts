@@ -1,5 +1,5 @@
 import { ROOK, cardPoints, effectiveSuit, strength, suitOf, type CardId } from './cards'
-import { legalBids, legalPlays, trickWinner, type BidAction, type HandState } from './engine'
+import { canClaimRest, legalBids, legalPlays, trickWinner, type Action, type BidAction, type HandState } from './engine'
 import type { Rng } from './rng'
 import { SUITS, type Suit } from './rules'
 
@@ -145,4 +145,29 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
     return lowest(winning, state) === winning[0] ? [...winning].sort((a, b) => str(a, state) - str(b, state))[0] : winning[0]
   }
   return lowest(legal, state)
+}
+
+/**
+ * Whatever a bot would do right now for `seat`, in any phase. Also used when a
+ * person's clock runs out, with `overshootAccept: false` so the table never
+ * shoots the Moon on someone's behalf.
+ */
+export function botDecision(state: HandState, seat: number, rng: Rng, opts: { overshootAccept?: boolean } = {}): Action | null {
+  if (state.turnSeat !== seat) return null
+  switch (state.phase) {
+    case 'bidding':
+      return { type: 'bid', seat, bid: botBid(state, seat, rng) }
+    case 'overshoot':
+      return { type: 'overshoot', seat, accept: opts.overshootAccept ?? rng() < 0.15 }
+    case 'nest':
+      return state.nestPickedUp === 0 ? { type: 'pickup', seat } : { type: 'discard', seat, cards: botDiscard(state, seat) }
+    case 'trump':
+      return { type: 'trump', seat, trump: botTrump(state, seat) }
+    case 'playing':
+      // A hand that cannot lose another trick is thrown in rather than played out.
+      if (canClaimRest(state, seat)) return { type: 'claim', seat }
+      return { type: 'play', seat, card: botPlay(state, seat, rng) }
+    case 'over':
+      return null
+  }
 }
