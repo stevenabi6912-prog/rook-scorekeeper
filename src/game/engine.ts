@@ -146,11 +146,16 @@ export function legalBids(state: HandState, seat: number): BidAction[] {
   const { rules } = state
   const out: BidAction[] = []
   for (let b = rules.minBid; b <= rules.maxBid; b += rules.bidStep) if (outbids(b, state.bidding.highBid)) out.push(b)
-  if (outbids('moon', state.bidding.highBid)) out.push('moon')
+  if (outbids('moon', state.bidding.highBid) && mayShoot(state, seat)) out.push('moon')
   // Everyone else has passed and nobody bid: the dealer is stuck, no passing.
   const othersPassed = state.bidding.passed.every((p, i) => p || i === seat)
   if (!(othersPassed && state.bidding.highBid === null)) out.push('pass')
   return out
+}
+
+/** Under moonOnlyAsFirstBid a player who has already called a number cannot shoot. */
+function mayShoot(state: HandState, seat: number): boolean {
+  return !state.rules.moonOnlyAsFirstBid || !state.bidding.calls.some((c) => c.seat === seat)
 }
 
 function applyBid(state: HandState, seat: number, bid: BidAction): Result {
@@ -182,6 +187,7 @@ function applyBid(state: HandState, seat: number, bid: BidAction): Result {
     return fail(`Bids are ${rules.minBid} to ${rules.maxBid} in steps of ${rules.bidStep}, or Moon.`)
   }
   if (!outbids(bid, b.highBid)) return fail('You must bid higher than the current bid.')
+  if (bid === 'moon' && !mayShoot(state, seat)) return fail('Moon can only be your first bid.')
 
   b.highBid = bid
   b.highSeat = seat

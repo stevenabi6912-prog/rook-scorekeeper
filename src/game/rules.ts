@@ -34,6 +34,8 @@ export interface Rules {
   stopEarlyOnBrokenMoon: boolean
   /** After someone bids Moon the dealer may take the Moon for themselves. */
   dealerMayOvershoot: boolean
+  /** Moon may only be a player's first call; once you have bid a number you cannot shoot. */
+  moonOnlyAsFirstBid: boolean
 }
 
 /** Steven's family rules, answered 2026-10-25. See the plan doc for open questions. */
@@ -54,6 +56,7 @@ export const FAMILY_RULES: Rules = {
   moonRequiresAllTricks: true,
   stopEarlyOnBrokenMoon: false,
   dealerMayOvershoot: true,
+  moonOnlyAsFirstBid: true,
 }
 
 export const ALL_RANKS: number[] = Array.from({ length: 14 }, (_, i) => i + 1)

@@ -189,7 +189,8 @@ each maps to a field in `src/game/rules.ts`.
 | 8 | Rook led counts as a trump lead; others must play trump if able. | built in |
 | 9 | Nest is 5 cards, 4- or 6-handed. | `nestSize: 5` |
 | 10, 11, 12 | **Nobody picks up the nest.** It stays face down and its points go to the team that wins the last trick. No discarding. | `nestToLastTrick: true`, no nest phase |
-| 13–17 | Bidding starts left of dealer, clockwise; a pass is final; if everyone passes the dealer takes it at 65; dealer bids in turn; jump bids allowed. | `bidding.ts` |
+| 13–17 | Bidding starts left of dealer, clockwise; a pass is final; if everyone passes the dealer takes it at 65; dealer bids in turn. **Jump bids are allowed**: the opening bid can be any multiple of 5 from 65 up (80, say) and any later bid can jump by more than 5 (80 to 90, or 80 to 120). | `legalBids` |
+| 17b | **Moon may only be a player's first call.** Once you have bid a number you cannot shoot later in the auction. (Steven, 2026-10-25.) | `moonOnlyAsFirstBid: true` |
 | 18 | **Moon means the bidding team must take every trick.** | `moonRequiresAllTricks: true` |
 | 19 | Partner plays normally on a Moon. | built in |
 | 20 | Nest still goes to the last trick on a Moon (so the shooting team collects it by taking every trick). | built in |
@@ -199,8 +200,11 @@ each maps to a field in `src/game/rules.ts`.
 | 24, 25 | Must follow the led color; if void, anything. Highest trump wins, else highest of the led color. | `trick.ts` |
 | 26 | No last-trick bonus beyond the nest. | built in |
 | 28 | Rook holder recorded as the player dealt the Rook; null if it was in the nest. | `rookHolderSeat` |
-| 29 | **Overshoot:** when someone bids Moon, the dealer may (not must) "over shoot" and take the Moon themselves. **Open questions:** does the dealer get this even after passing earlier? Is an overshoot scored like a normal Moon, or is it a higher stake? Can the first shooter respond? Engine defaults: dealer may overshoot only if they have not passed; scored as an ordinary Moon; no further bidding. | `dealerMayOvershoot: true` |
-| 30, 31, 32 | Not yet answered: deck look, sound style, voice notes. Defaults stand. | |
+| 29 | **Overshoot (confirmed):** when someone bids Moon, the dealer may (not must) "over shoot" and take the Moon themselves. Scored exactly like a normal Moon; the first shooter cannot respond; the auction ends. Because a Moon must be a first call (17b) and the dealer calls last in the first round, the dealer has never bid or passed when the offer comes, so the "dealer already passed" case cannot arise under these rules. If the dealer shoots, nobody can overshoot. | `dealerMayOvershoot: true` |
+| 30 | Steven sent photos of the family deck: the classic Parker Brothers / Hasbro Rook deck. White faces; a big numeral top-left in the card's color with the color name printed vertically beside it ("RED", "BLACK", "GREEN", "YELLOW"); a small square badge with the point value under the numeral on point cards; a large numeral in the center inside a thin square frame; the whole index repeated upside down bottom-right. Green is a blue-green, yellow is golden. The Rook card is a drawn bird with "ROOK" vertical and a big "20". Backs are light blue with a scribbled texture and the ROOK logo. The `Card` component reproduces this layout; the back uses the same blue texture with the family's raven instead of the trademarked logo. | `Card.tsx` |
+| 31 | Sound style: default stands (realistic card sounds, a few short musical cues for bids, trump, Moon, your turn). | `sound.ts` |
+| 32 | **Voice notes: yes.** See 3.10. | messages `kind: 'voice'` |
+| — | The family calls the nest the **Kitty**. Every screen says Kitty; the code keeps `nest` as the identifier. | |
 
 ---
 
@@ -274,8 +278,9 @@ sound be on by default when someone opens the table, or off until they tap
 the speaker? Default: on, with the mute toggle remembered.
 
 **Q32. Chat.** Free text plus quick reactions is the default. Do you also
-want voice notes (short recorded clips; these need Firebase Storage, which is
-on the free plan), or is text enough? Default: text and reactions only.
+want voice notes (short recorded clips), or is text enough? Default: text and
+reactions only. (Answered: yes to voice notes; see 3.10 for how they are
+stored without Firebase Storage.)
 
 ---
 
@@ -584,6 +589,25 @@ it stays as a practice mode afterwards.
   takeover path.
 - **Abandon:** the host can end a match; the linked game stays with whatever
   hands were recorded, exactly as if the family had stopped a paper game.
+
+### 3.10 Voice notes
+
+Correction to an earlier line in this doc: Firebase projects created after
+October 2024 need the Blaze (billing-enabled) plan to create a Cloud Storage
+bucket, so Storage is **not** available to this project on Spark.
+
+Voice notes do not need it. A clip is recorded in the browser with
+`MediaRecorder` (Opus in Chrome/Android, AAC in Safari/iOS), capped at 15
+seconds, which is 30–60 KB. It is stored base64-encoded inside the chat
+message document (`kind: 'voice'`, `audio`, `mimeType`, `durationMs`), well
+under Firestore's 1 MiB document limit. Playback is a tap on the message; the
+clip is cached locally after the first play. Rules cap `audio` at 200 KB.
+Cost at family scale is negligible (a loud evening of 100 clips is ~5 MB of
+storage and bandwidth; the free tier is 1 GiB stored and 10 GiB/month out).
+
+Microphone access is requested on the first tap of the record button, and
+the clip is sent only when the player lets go of the button, with a slide-to-
+cancel like a messaging app.
 
 ---
 

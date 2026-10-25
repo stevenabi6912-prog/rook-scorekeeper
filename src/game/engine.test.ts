@@ -99,12 +99,28 @@ describe('bidding', () => {
     expect(legalBids(s, 1)).toEqual([])
   })
 
-  it('lists legal calls: higher bids, Moon, and pass', () => {
+  it('lists legal calls: any higher bid (jumps allowed), Moon, and pass', () => {
     let s = base()
     expect(legalBids(s, 0)).toEqual([65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 'moon', 'pass'])
-    s = mustApply(s, bid(0, 110))
-    expect(legalBids(s, 1)).toEqual([115, 120, 'moon', 'pass'])
+    s = mustApply(s, bid(0, 80)) // opening bid need not be 65
+    expect(legalBids(s, 1)).toEqual([85, 90, 95, 100, 105, 110, 115, 120, 'moon', 'pass'])
+    s = mustApply(s, bid(1, 110)) // and a jump from 80 to 110 is fine
+    expect(legalBids(s, 2)).toEqual([115, 120, 'moon', 'pass'])
     expect(legalBids(s, 0)).toEqual([])
+  })
+
+  it('Moon may only be a player\'s first call', () => {
+    let s = base()
+    s = mustApply(s, bid(0, 65))
+    s = mustApply(s, bid(1, 70))
+    s = mustApply(s, bid(2, 'pass'))
+    s = mustApply(s, bid(3, 'pass'))
+    // seat 0 already bid 65, so no Moon now
+    expect(legalBids(s, 0)).not.toContain('moon')
+    expect(applyAction(s, bid(0, 'moon')).ok).toBe(false)
+    expect(applyAction(s, bid(0, 'moon'))).toMatchObject({ ok: false, error: /first bid/ })
+    // but a first call may be a Moon straight away
+    expect(legalBids(base(), 0)).toContain('moon')
   })
 
   it('sticks the dealer with 65 when everyone passes', () => {
@@ -154,8 +170,9 @@ describe('bidding', () => {
     t = mustApply(t, bid(3, 'pass'))
     expect(t.bidderSeat).toBe(0)
 
-    // Dealer passes early, then someone shoots: straight to trump.
-    let u = base()
+    // Dealer passes early, then someone shoots (only possible when a Moon
+    // need not be a first call): straight to trump, no overshoot.
+    let u = fixed([['R5'], ['R6'], ['R7'], ['R8']], [], 3, { ...R, moonOnlyAsFirstBid: false })
     u = mustApply(u, bid(0, 65))
     u = mustApply(u, bid(1, 70))
     u = mustApply(u, bid(2, 75))
