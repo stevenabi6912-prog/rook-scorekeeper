@@ -16,7 +16,7 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
   if (familyCode && state === 'connecting') {
     return (
       <div className="gate">
-        <div className="logo">🃏</div>
+        <div className="logo"><img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width="72" height="72" style={{ borderRadius: 16 }} /></div>
         <h1>Rook</h1>
         <div className="spinner" />
         <p className="sub">Connecting…</p>
@@ -28,7 +28,7 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
   if (familyCode && state === 'error') {
     return (
       <div className="gate">
-        <div className="logo">🃏</div>
+        <div className="logo"><img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width="72" height="72" style={{ borderRadius: 16 }} /></div>
         <h1>Rook</h1>
         <div className="error">{error}</div>
         <button className="btn primary block" onClick={() => join(familyCode)}>Try again</button>
@@ -51,7 +51,7 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="gate">
-      <div className="logo">🃏</div>
+      <div className="logo"><img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width="72" height="72" style={{ borderRadius: 16 }} /></div>
       <h1>Rook Scorekeeper</h1>
       <p className="sub">Enter your family passcode. Everyone who uses the same passcode sees the same games.</p>
       {!firebaseConfigured && (
