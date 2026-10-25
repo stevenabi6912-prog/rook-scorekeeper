@@ -104,30 +104,43 @@ export function TableView(props: TableViewProps) {
     if (state.phase === 'over' && prev.phase !== 'over' && state.claimedBySeat !== null) sounds.trickSweep()
   }, [state])
 
+  // Sweep timers live in a ref so a later state change (a claim right after a
+  // trick, say) can replace or cancel them without leaving the table stuck.
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const clearSweepTimers = () => {
+    timersRef.current.forEach(clearTimeout)
+    timersRef.current = []
+  }
+  useEffect(() => clearSweepTimers, [])
+
   // New hand: forget the old sweep bookkeeping.
   useEffect(() => {
-    seenTricks.current = Math.min(seenTricks.current, state.tricks.length)
-    if (state.tricks.length === 0) setSweep(null)
+    if (state.tricks.length === 0) {
+      seenTricks.current = 0
+      clearSweepTimers()
+      setSweep(null)
+    }
   }, [handNumber, state.tricks.length])
 
   // Trick completed: rest, then sweep to the winner.
   useEffect(() => {
-    if (state.tricks.length > seenTricks.current) {
-      seenTricks.current = state.tricks.length
-      const trick = state.tricks[state.tricks.length - 1]
-      // A claim ends the hand with synthetic tricks; do not animate those.
-      if (state.claimedBySeat !== null) return
-      setSweep({ trick, stage: 'rest' })
-      const t1 = setTimeout(() => {
+    if (state.tricks.length <= seenTricks.current) return
+    seenTricks.current = state.tricks.length
+    clearSweepTimers()
+    // A claim ends the hand with synthetic tricks; nothing to animate.
+    if (state.claimedBySeat !== null) {
+      setSweep(null)
+      return
+    }
+    const trick = state.tricks[state.tricks.length - 1]
+    setSweep({ trick, stage: 'rest' })
+    timersRef.current.push(
+      setTimeout(() => {
         setSweep({ trick, stage: 'move' })
         sounds.trickSweep()
-      }, REST_MS)
-      const t2 = setTimeout(() => setSweep(null), REST_MS + SWEEP_MS)
-      return () => {
-        clearTimeout(t1)
-        clearTimeout(t2)
-      }
-    }
+      }, REST_MS),
+      setTimeout(() => setSweep(null), REST_MS + SWEEP_MS),
+    )
   }, [state.tricks.length, state.tricks, state.claimedBySeat])
 
   // Result sounds once the summary appears.

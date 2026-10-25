@@ -11,6 +11,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { StatsPage } from './pages/StatsPage'
 import { DemoTablePage } from './play/pages/DemoTablePage'
 import { PlayLobbyPage } from './play/pages/PlayLobbyPage'
+import { TablePage } from './play/pages/TablePage'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
               <Route path="/play" element={<PlayLobbyPage />} />
             </Route>
             <Route path="/play/demo" element={<DemoTablePage />} />
+            <Route path="/play/:matchId" element={<TablePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/new" element={<NewGamePage />} />
             <Route path="/game/:gameId" element={<GamePage />} />

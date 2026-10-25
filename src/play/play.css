@@ -248,3 +248,11 @@
 .lobby-card { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; }
 .lobby-card-title { font-weight: 700; font-size: 1.05rem; }
 .lobby-arrow { font-size: 1.6rem; color: var(--muted); }
+
+/* Seat switcher (one phone holding several seats) */
+.seat-switcher {
+  position: fixed; top: calc(env(safe-area-inset-top) + 62px); left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; z-index: 20; background: rgba(0, 0, 0, 0.5); padding: 4px; border-radius: 999px;
+}
+.seat-switcher .chip { min-height: 32px; padding: 2px 10px; font-size: 0.8rem; background: transparent; color: #fff; border-color: transparent; }
+.seat-switcher .chip.selected { background: #fff; color: #15202b; }
