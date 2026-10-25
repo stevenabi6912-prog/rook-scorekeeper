@@ -357,6 +357,7 @@ interface Match {
     playerId: string
     team: 'A' | 'B'
     uid: string | null           // Firebase anonymous uid of the phone holding this seat
+    bot: boolean                 // filled by a bot that the host's phone moves (3.4b)
     cardCount: number            // so others can draw the right number of card backs
     connectedAt: number | null
   }>
@@ -426,6 +427,33 @@ Flow:
    player themself from another seat) can "release" a seat, setting `uid` to
    null, and the new phone claims it. The private seat doc does not move; it
    is keyed by seat index and the rule below re-checks the uid on every read.
+
+### 3.4b Mixed tables: people and bots
+
+The practice table is all bots, but an online table is for real people
+first. Seats work like this:
+
+- A table starts with every seat open. Family members claim seats from their
+  phones as in 3.4. Nothing fills in automatically while the host is waiting
+  for people.
+- When the host is ready, any seat still open can be given to a bot with one
+  tap ("Fill the rest with bots"), or left open for someone to join before
+  the first deal. A bot seat shows a robot badge instead of a phone.
+- A bot never takes a seat a person holds. If a person leaves mid-game, the
+  host can hand that seat to a bot for the rest of the game (same takeover
+  path as 3.9), and hand it back when they return.
+- With no server, the host's phone runs the bots: when it is a bot's turn,
+  the host client computes the move with `src/game/bots.ts` and commits it
+  as that seat, after the same short pause a person would take. Firestore
+  rules allow the host uid to act for seats marked `bot: true`. If the host's
+  phone is closed, bots stop moving until it comes back, and the table says
+  so ("Waiting for Steven's phone to move Hank").
+- Bot seats write their cards to the same private seat documents, so the
+  game looks identical to the other players and the hand archive stays
+  complete.
+
+The practice table remains available on its own as "you and bots" for
+learning and for playing when nobody else is around.
 
 ### 3.5 Shuffling and dealing: who can be trusted?
 

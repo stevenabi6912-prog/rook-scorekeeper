@@ -136,17 +136,19 @@ export const sounds = {
     whoosh(c, { dur: 0.42, from: 500, to: 2200, gain: 0.22, q: 0.9, attack: 0.08 })
     whoosh(c, { at: 0.36, dur: 0.05, from: 2000, to: 800, gain: 0.2, q: 2, attack: 0.004 })
   },
-  /** A knock on the table for a bid. */
+  /** Calling a bid: a short, bright two-note call. */
   bid() {
+    const c = audio()
+    if (!c) return
+    tone(c, { freq: NOTE(79), type: 'triangle', dur: 0.09, gain: 0.16, attack: 0.005 })
+    tone(c, { freq: NOTE(84), type: 'triangle', at: 0.08, dur: 0.16, gain: 0.16, attack: 0.005 })
+  },
+  /** A knock on the table: pass. */
+  pass() {
     const c = audio()
     if (!c) return
     tone(c, { freq: 180, freqEnd: 70, type: 'sine', dur: 0.12, gain: 0.5, attack: 0.004 })
     whoosh(c, { dur: 0.04, from: 1200, to: 400, gain: 0.15, q: 1, attack: 0.003 })
-  },
-  pass() {
-    const c = audio()
-    if (!c) return
-    tone(c, { freq: 120, freqEnd: 60, type: 'sine', dur: 0.14, gain: 0.3, attack: 0.01 })
   },
   /** Trump is named: a short brassy flourish. */
   trump() {
@@ -193,7 +195,8 @@ export const sounds = {
       tone(c, { freq: NOTE(88), type: 'sine', dur: 0.16, gain: 0.18 })
       tone(c, { freq: NOTE(92), type: 'sine', at: 0.13, dur: 0.35, gain: 0.18 })
     }
-    if (!unlocked) return
+    const active = unlocked || (navigator as unknown as { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive
+    if (!active) return
     try {
       navigator.vibrate?.(35)
     } catch {

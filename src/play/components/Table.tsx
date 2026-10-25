@@ -28,8 +28,8 @@ interface TableProps {
 /** Where seat `k` (relative to me, clockwise) sits, as a fraction of the table. */
 export function seatPosition(k: number, n: number): { x: number; y: number } {
   const angle = Math.PI / 2 + (k * 2 * Math.PI) / n
-  const rx = n > 4 ? 0.4 : 0.37
-  const ry = n > 4 ? 0.42 : 0.4
+  const rx = n > 4 ? 0.36 : 0.37
+  const ry = n > 4 ? 0.36 : 0.4
   return { x: 0.5 + rx * Math.cos(angle), y: 0.5 + ry * Math.sin(angle) }
 }
 

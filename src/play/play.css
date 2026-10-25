@@ -94,6 +94,11 @@
   flex-direction: column; gap: 2px; padding: 4px 8px; border-radius: 14px; max-width: 84px;
 }
 .seat-spot .seat-name { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+/* Six seats: the side seats are close together, so the stack sits beside the badge. */
+.seat-spot.n6.k1, .seat-spot.n6.k2 { flex-direction: row; }
+.seat-spot.n6.k4, .seat-spot.n6.k5 { flex-direction: row-reverse; }
+.seat-spot.n6.k1 .bubble, .seat-spot.n6.k2 .bubble, .seat-spot.n6.k4 .bubble, .seat-spot.n6.k5 .bubble { top: auto; bottom: 100%; margin: 0 0 6px; }
+.seat-spot.n6.k1 .bubble::before, .seat-spot.n6.k2 .bubble::before, .seat-spot.n6.k4 .bubble::before, .seat-spot.n6.k5 .bubble::before { top: auto; bottom: -5px; }
 .seat-spot.k1 .bubble, .seat-spot.n4.k3 .bubble, .seat-spot.n6.k5 .bubble { top: auto; bottom: 100%; margin: 0 0 6px; }
 .seat-spot.k1 .bubble::before, .seat-spot.n4.k3 .bubble::before, .seat-spot.n6.k5 .bubble::before { top: auto; bottom: -5px; }
 

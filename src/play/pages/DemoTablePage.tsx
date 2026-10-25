@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { botBid, botPlay, botTrump } from '../../game/bots'
 import type { CardId } from '../../game/cards'
 import { applyAction, legalBids, legalPlays, startHand, type Action, type BidAction, type HandState } from '../../game/engine'
@@ -7,7 +7,7 @@ import { randomSeed, seededRng } from '../../game/rng'
 import { FAMILY_RULES } from '../../game/rules'
 import { summarizeHand, tallies, toHandInput, type HandResult } from '../../game/score'
 import { scoreHand, teamsAtTarget, type HandOutcome, type Scores } from '../../lib/scoring'
-import type { TeamId } from '../../lib/types'
+import type { Handedness, TeamId } from '../../lib/types'
 import { BidPanel, HandSummary, OvershootPanel, TrumpChip, TrumpPanel } from '../components/Panels'
 import { HandFan } from '../components/Hand'
 import { SeatBadge, Table, type SeatInfo, type Sweep } from '../components/Table'
@@ -21,19 +21,39 @@ import '../play.css'
  */
 
 const ME = 0
-const SEATS: SeatInfo[] = [
+const ALL_SEATS: SeatInfo[] = [
   { name: 'You', emoji: '🙂', color: '#1f6feb', team: 'A' },
   { name: 'Hank', emoji: '🤠', color: '#d9480f', team: 'B' },
   { name: 'Rosie', emoji: '🦊', color: '#2f9e44', team: 'A' },
   { name: 'June', emoji: '🦉', color: '#9c36b5', team: 'B' },
+  { name: 'Walt', emoji: '🐻', color: '#0ca678', team: 'A' },
+  { name: 'Pearl', emoji: '🐧', color: '#e03131', team: 'B' },
 ]
-const TEAM_NAMES: Record<TeamId, string> = { A: 'You & Rosie', B: 'Hank & June' }
-const PLAYER_IDS = SEATS.map((s) => `demo-${s.name.toLowerCase()}`)
-const TEAMS = SEATS.map((s) => s.team)
+interface TableConfig {
+  handedness: Handedness
+  seats: SeatInfo[]
+  teamNames: Record<TeamId, string>
+  playerIds: string[]
+  teams: TeamId[]
+  /** The computer plays your seat too (for watching or testing). */
+  autopilot: boolean
+}
+
+function tableConfig(handedness: Handedness, autopilot: boolean): TableConfig {
+  const seats = ALL_SEATS.slice(0, handedness)
+  const names = (team: TeamId) => seats.filter((s) => s.team === team).map((s) => s.name)
+  const join = (list: string[]) => list.slice(0, -1).join(', ') + ' & ' + list.slice(-1)
+  return {
+    handedness,
+    seats,
+    teamNames: { A: join(names('A')), B: join(names('B')) },
+    playerIds: seats.map((s) => `demo-${s.name.toLowerCase()}`),
+    teams: seats.map((s) => s.team),
+    autopilot,
+  }
+}
 
 const BOT_DELAY = 750
-/** `#/play/demo?auto` lets the computer play your seat too (for watching or testing). */
-const AUTOPILOT = typeof window !== 'undefined' && /[?&]auto\b/.test(window.location.hash)
 const REST_MS = 900
 const SWEEP_MS = 450
 
@@ -43,12 +63,24 @@ interface Finished {
   before: Scores
 }
 
+/** `#/play/demo?players=6` seats five bots instead of three; `?auto` lets the bots play your seat. */
 export function DemoTablePage() {
+  const [params] = useSearchParams()
+  const handedness: Handedness = params.get('players') === '6' ? 6 : 4
+  const autopilot = params.has('auto')
+  const cfg = useMemo(() => tableConfig(handedness, autopilot), [handedness, autopilot])
+  // Remount on a different table size so every piece of state starts over.
+  return <DemoTable key={`${handedness}-${autopilot}`} cfg={cfg} />
+}
+
+function DemoTable({ cfg }: { cfg: TableConfig }) {
+  const { handedness: HANDEDNESS, seats: SEATS, teamNames: TEAM_NAMES, playerIds: PLAYER_IDS, teams: TEAMS, autopilot: AUTOPILOT } = cfg
+  const LAST = HANDEDNESS - 1
   const rng = useMemo(() => seededRng(randomSeed()), [])
-  const [dealerSeat, setDealerSeat] = useState(3)
+  const [dealerSeat, setDealerSeat] = useState(LAST)
   const [handNumber, setHandNumber] = useState(1)
   const [totals, setTotals] = useState<Scores>({ A: 0, B: 0 })
-  const [state, setState] = useState<HandState>(() => newHand(3))
+  const [state, setState] = useState<HandState>(() => newHand(LAST))
   const [selected, setSelected] = useState<CardId | null>(null)
   const [sweep, setSweep] = useState<Sweep | null>(null)
   const [finished, setFinished] = useState<Finished | null>(null)
@@ -57,7 +89,7 @@ export function DemoTablePage() {
   const seenTricks = useRef(0)
 
   function newHand(dealer: number): HandState {
-    return startHand({ rules: FAMILY_RULES, handedness: 4, teams: TEAMS, dealerSeat: dealer, seed: randomSeed() })
+    return startHand({ rules: FAMILY_RULES, handedness: HANDEDNESS, teams: TEAMS, dealerSeat: dealer, seed: randomSeed() })
   }
 
   const busy = sweep !== null || finished !== null
@@ -112,7 +144,7 @@ export function DemoTablePage() {
     if (result.bid === 'moon' && result.moonMade) sounds.moonMade()
     else if (result.made) sounds.made()
     else sounds.set()
-  }, [state, sweep, finished, totals])
+  }, [state, sweep, finished, totals, PLAYER_IDS])
 
   // Bots take their turn after a short pause.
   useEffect(() => {
@@ -126,7 +158,7 @@ export function DemoTablePage() {
       else if (state.phase === 'playing') act({ type: 'play', seat, card: botPlay(state, seat, rng) })
     }, BOT_DELAY + rng() * 500)
     return () => clearTimeout(timer)
-  }, [state, busy, act, rng])
+  }, [state, busy, act, rng, AUTOPILOT])
 
   // Chime when it becomes my move.
   const lastTurnRef = useRef<string>('')
@@ -166,11 +198,11 @@ export function DemoTablePage() {
     if (finished && teamsAtTarget(finished.outcome.totals).length > 0) {
       setTotals({ A: 0, B: 0 })
       setHandNumber(1)
-      const d = 3
+      const d = LAST
       setDealerSeat(d)
       setState(newHand(d))
     } else {
-      const d = (dealerSeat + 1) % 4
+      const d = (dealerSeat + 1) % HANDEDNESS
       setDealerSeat(d)
       setHandNumber((n) => n + 1)
       setState(newHand(d))
@@ -190,6 +222,7 @@ export function DemoTablePage() {
   })()
 
   const bubbles = useMemo(() => bubblesFor(state, busy), [state, busy])
+  const status = statusText(state, myTurn, busy, selected, SEATS)
   const live = tallies(state)
   const bidLabel = state.bid === null
     ? state.bidding.highBid === null ? 'No bid' : `${state.bidding.highBid === 'moon' ? 'Moon' : state.bidding.highBid} · ${SEATS[state.bidding.highSeat!].name}`
@@ -226,14 +259,14 @@ export function DemoTablePage() {
       <Table state={state} me={ME} seats={SEATS} bubbles={bubbles} sweep={sweep} />
 
       <div className="live-tally" aria-label="Points this hand">
-        <span className="team-A">You &amp; Rosie {live.points.A}</span>
-        <span className="team-B">Hank &amp; June {live.points.B}</span>
+        <span className="team-A">{TEAM_NAMES.A} {live.points.A}</span>
+        <span className="team-B">{TEAM_NAMES.B} {live.points.B}</span>
       </div>
 
       <div className="my-area">
         <div className="my-row">
           <SeatBadge info={SEATS[ME]} dealer={state.dealerSeat === ME} bidder={state.bidderSeat === ME} turn={myTurn} size="lg" />
-          <div className="my-status">{statusText(state, myTurn, busy, selected)}</div>
+          <div className="my-status">{status}</div>
           {state.phase === 'playing' && myTurn && selected && (
             <button type="button" className="btn primary play-btn" onClick={playSelected}>Play</button>
           )}
@@ -273,10 +306,10 @@ export function DemoTablePage() {
   )
 }
 
-function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: CardId | null): string {
+function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: CardId | null, seats: SeatInfo[]): string {
   if (state.phase === 'over') return 'Hand over'
   if (busy) return ''
-  const who = SEATS[state.turnSeat].name
+  const who = seats[state.turnSeat].name
   switch (state.phase) {
     case 'bidding':
       return myTurn ? 'Your bid' : `${who} is bidding…`
