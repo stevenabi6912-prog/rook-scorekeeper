@@ -71,6 +71,14 @@ export function PlayLobbyPage() {
         {error && <div className="error">{error}</div>}
 
         <section className="section">
+          <div className="row" style={{ gap: 8 }}>
+            <Link className="btn primary big grow" to="/play/demo">🤖 Practice against bots</Link>
+            <Link className="btn big" to="/play/demo?players=6" aria-label="Practice, 6 players">6 up</Link>
+          </div>
+          <p className="small muted center" style={{ marginTop: 6 }}>Just you and the computer, on this phone. Nothing is saved.</p>
+        </section>
+
+        <section className="section">
           <h3>Online tables</h3>
           {matches === null && <div className="spinner" />}
           {matches !== null && open.length === 0 && <div className="empty">No table is open. Start one from a game below and everyone taps their seat on their own phone.</div>}
@@ -130,24 +138,7 @@ export function PlayLobbyPage() {
           )}
         </section>
 
-        <section className="section">
-          <h3>Practice</h3>
-          <Link className="card tappable lobby-card" to="/play/demo">
-            <div className="grow">
-              <div className="lobby-card-title">4 players: you and 3 bots</div>
-              <div className="small muted">Partners across the table, 9 cards each. A full game on this phone.</div>
-            </div>
-            <span className="lobby-arrow">›</span>
-          </Link>
-          <Link className="card tappable lobby-card" to="/play/demo?players=6">
-            <div className="grow">
-              <div className="lobby-card-title">6 players: you and 5 bots</div>
-              <div className="small muted">Three a side, 6 cards each.</div>
-            </div>
-            <span className="lobby-arrow">›</span>
-          </Link>
-          <p className="small muted">The bots always play by the rules but keep no memory of what has been played, so they do make mistakes.</p>
-        </section>
+        <p className="small muted">Bots play by the rules and remember what has been played, but a good player will still beat them.</p>
       </main>
     </>
   )
