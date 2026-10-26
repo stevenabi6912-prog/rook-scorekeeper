@@ -23,8 +23,8 @@ interface TableProps {
   /** Speech bubble per seat (last bid, "thinking…", etc.). */
   bubbles: Record<number, ReactNode>
   sweep: Sweep | null
-  /** Cards being thrown in, fanned out on the table for a moment. */
-  reveal: { seat: number; cards: CardId[] } | null
+  /** Cards on the table when a hand ends on a throw-in: every seat's remaining cards, face up. */
+  reveal: { hands: Record<number, CardId[]>; claimer: number } | null
 }
 
 /** Where seat `k` (relative to me, clockwise) sits, as a fraction of the table. */
@@ -112,27 +112,33 @@ export function Table({ state, me, seats, bubbles, sweep, reveal }: TableProps) 
         </div>
       )}
 
-      {reveal && reveal.cards.map((card, i) => {
-        const k = rel(reveal.seat)
+      {reveal && Object.entries(reveal.hands).flatMap(([seatStr, cards]) => {
+        const seat = Number(seatStr)
+        const k = rel(seat)
         const to = trickPosition(k, n)
         const from = seatPosition(k, n)
-        const spread = (i - (reveal.cards.length - 1) / 2) * Math.min(cardW * 0.55, size.w / (reveal.cards.length + 1))
-        return (
-          <div
-            key={`reveal-${card}`}
-            className="trick-card slide-in reveal"
-            style={{
-              left: `calc(${to.x * 100}% + ${spread}px)`,
-              top: `${to.y * 100}%`,
-              ['--dx' as string]: `${(from.x - to.x) * size.w - spread}px`,
-              ['--dy' as string]: `${(from.y - to.y) * size.h}px`,
-              animationDelay: `${i * 0.12}s`,
-              zIndex: 30 + i,
-            }}
-          >
-            <Card id={card} width={Math.round(cardW * 0.8)} />
-          </div>
-        )
+        const isClaimer = seat === reveal.claimer
+        const w = Math.round(cardW * (isClaimer ? 0.72 : 0.56))
+        const step = Math.min(w * 0.5, (size.w * 0.9) / Math.max(1, cards.length))
+        return cards.map((card, i) => {
+          const spread = (i - (cards.length - 1) / 2) * step
+          return (
+            <div
+              key={`reveal-${seat}-${card}`}
+              className={`trick-card slide-in reveal${isClaimer ? ' claimer' : ''}`}
+              style={{
+                left: `calc(${to.x * 100}% + ${spread}px)`,
+                top: `${to.y * 100}%`,
+                ['--dx' as string]: `${(from.x - to.x) * size.w - spread}px`,
+                ['--dy' as string]: `${(from.y - to.y) * size.h}px`,
+                animationDelay: `${(isClaimer ? 0 : 0.3) + i * 0.08}s`,
+                zIndex: 30 + i,
+              }}
+            >
+              <Card id={card} width={w} />
+            </div>
+          )
+        })
       })}
 
       {plays.map((p) => {

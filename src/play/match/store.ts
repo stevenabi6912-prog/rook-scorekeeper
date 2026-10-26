@@ -29,6 +29,8 @@ export interface MatchStore {
   subscribeMatch(id: string, cb: (match: MatchDoc | null) => void, onError?: (e: Error) => void): Unsubscribe
   /** This seat's cards; null until dealt. Only readable by the seat's phone (or the host for bots). */
   subscribeSeat(matchId: string, seat: number, cb: (cards: CardId[] | null) => void, onError?: (e: Error) => void): Unsubscribe
+  /** One-shot read of a seat's cards (everyone may read every seat once a hand is over). */
+  getSeat(matchId: string, seat: number): Promise<CardId[]>
 
   createMatch(m: NewMatch): Promise<string>
   deleteMatch(id: string): Promise<void>

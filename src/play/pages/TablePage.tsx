@@ -227,6 +227,32 @@ function LiveTable({
   }, [matchStore, match.id, me])
 
   const pub = match.pub!
+
+  // When a hand ends on a throw-in, everyone's remaining cards are shown face up.
+  const [revealHands, setRevealHands] = useState<Record<number, CardId[]>>({})
+  const claimKey = pub.phase === 'over' && pub.claimedBySeat !== null ? `${match.handNumber}:${pub.claimedBySeat}` : ''
+  useEffect(() => {
+    if (!claimKey) {
+      setRevealHands({})
+      return
+    }
+    let cancelled = false
+    Promise.all(
+      match.seats.map(async (_s, seat) => {
+        if (seat === pub.claimedBySeat) return [seat, []] as const
+        if (seat === me) return [seat, cards ?? []] as const
+        // Older rules may refuse this read; then that seat simply stays hidden.
+        return [seat, await matchStore.getSeat(match.id, seat).catch(() => [] as CardId[])] as const
+      }),
+    ).then((entries) => {
+      if (!cancelled) setRevealHands(Object.fromEntries(entries.filter(([, c]) => c.length > 0)))
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claimKey, matchStore, match.id, me])
+
   useEffect(() => {
     if (!autopilot || pub.turnSeat !== me || pub.phase === 'over' || cards === null) return
     const timer = setTimeout(() => {
@@ -284,6 +310,7 @@ function LiveTable({
         waitingFor={gameOver ? 'Finishing the game…' : `Waiting for ${hostName} to deal…`}
         backTo="/play"
         notice={notice}
+        revealHands={revealHands}
       />
       {seatsHeld.length > 1 && (
         <div className="seat-switcher" role="tablist" aria-label="Your seats">

@@ -323,10 +323,15 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
   if (partnerWinning) {
     const partnerCard = plays[plays.findIndex((p) => p.seat === currentWinner)].card
     const partnerSafe = last || (isBoss(partnerCard, k, rules) && !opponentCouldBeat(state, k, seat, partnerCard))
-    if (partnerSafe) return juiciest(legal, rules)
-    // Partner may yet be beaten: take over only with a sure thing when it is worth it.
-    if (safeWinners.length && trickPoints + pts(juiciest(legal, rules), rules) >= 10) return lowest(safeWinners, rules)
-    return cheapest(legal, rules)
+    // Never ruff your own partner: feed from the plain cards; trumps only if that is all you hold.
+    const plainLegal = legal.filter((c) => !isTrump(c))
+    if (partnerSafe) return plainLegal.length ? juiciest(plainLegal, rules) : cheapest(legal, rules)
+    // Partner may yet be beaten: take over only with a sure plain winner when it is worth it,
+    // or with a trump when an opponent could otherwise ruff a fat trick.
+    const plainSafeWinners = safeWinners.filter((c) => !isTrump(c))
+    if (plainSafeWinners.length && trickPoints + pts(juiciest(legal, rules), rules) >= 10) return lowest(plainSafeWinners, rules)
+    if (plainLegal.length === 0 && safeWinners.length && trickPoints >= 10) return lowest(safeWinners, rules)
+    return plainLegal.length ? cheapest(plainLegal, rules) : cheapest(legal, rules)
   }
 
   if (winning.length) {

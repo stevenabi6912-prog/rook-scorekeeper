@@ -101,11 +101,13 @@ service cloud.firestore {
 
         match /seats/{seat} {
           // Your own cards; the host may see a bot's cards; anyone seated may
-          // see a stalled seat's cards to move for it.
+          // see a stalled seat's cards to move for it; everyone may see every
+          // hand once the hand is over (cards thrown in are shown face up).
           allow read: if signedIn() && validCode(code) && (
             seatUid(int(seat)) == request.auth.uid
             || (isHost() && table().seats[int(seat)].bot)
-            || (isSeated() && turnIsStale() && table().pub.turnSeat == int(seat)));
+            || (isSeated() && turnIsStale() && table().pub.turnSeat == int(seat))
+            || (table().pub != null && table().pub.phase == 'over'));
           allow write: if signedIn() && validCode(code) && (
             (isHost() && betweenHands())
             || seatUid(int(seat)) == request.auth.uid

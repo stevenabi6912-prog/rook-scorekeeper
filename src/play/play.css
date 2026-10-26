@@ -145,6 +145,7 @@
 .trick-card.winning { z-index: 40 !important; }
 .trick-card.winning .rook-card { box-shadow: 0 0 0 3px #ffd54a, 0 0 24px rgba(255, 213, 74, 0.8); transition: box-shadow 0.25s ease 0.4s; }
 .trick-card.reveal { animation-duration: 0.6s; }
+.trick-card.reveal.claimer .rook-card { box-shadow: var(--card-shadow), 0 0 0 2px #ffd54a; }
 .kitty.with-bidder { transform: translate(-50%, -50%) scale(0.9); opacity: 0.85; transition: left 0.6s ease, top 0.6s ease; }
 .kitty.with-bidder .kitty-label { font-size: 0.56rem; margin-top: 3px; }
 .trick-card.sweep-out { animation: sweep-out 0.45s cubic-bezier(0.4, 0, 0.8, 0.4) both; }

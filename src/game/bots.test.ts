@@ -56,6 +56,22 @@ describe('bots', () => {
     expect(botDecision(weak, 0, seededRng('x'))).toEqual({ type: 'bid', seat: 0, bid: 'pass' })
   })
 
+  it('do not trump their own partner when the partner holds the trick', () => {
+    // Trump is green. Seat 2 (partner of seat 0) leads black 14 and is winning; seat 0 is
+    // void in black and holds a point trump plus a harmless yellow card.
+    let s = startHandFromDeal(
+      { rules: FAMILY_RULES, handedness: 4, teams: TEAMS4, dealerSeat: 1 },
+      { hands: [['G10', 'Y6', 'R7'], ['B5', 'R8', 'Y9'], ['B14', 'B6', 'R9'], ['B7', 'Y7', 'R10']], nest: [] },
+    )
+    for (const a of [{ type: 'bid', seat: 2, bid: 70 }, { type: 'bid', seat: 3, bid: 'pass' }, { type: 'bid', seat: 0, bid: 'pass' }, { type: 'bid', seat: 1, bid: 'pass' }, { type: 'trump', seat: 2, trump: 'green' }, { type: 'play', seat: 2, card: 'B14' }, { type: 'play', seat: 3, card: 'B7' }] as const) {
+      const r = applyAction(s, a)
+      if (!r.ok) throw new Error(r.error)
+      s = r.state
+    }
+    const choice = botDecision(s, 0, seededRng('p'))
+    expect(choice).toEqual({ type: 'play', seat: 0, card: 'Y6' })
+  })
+
   it('never lay trump, the Rook or a 14 into the Kitty when they have a choice', () => {
     let s = startHandFromDeal(
       { rules: FAMILY_RULES, handedness: 4, teams: TEAMS4, dealerSeat: 3 },

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { botDecision } from '../../game/bots'
+import type { CardId } from '../../game/cards'
 import { applyAction, startHand, type Action, type HandState } from '../../game/engine'
 import { randomSeed, seededRng } from '../../game/rng'
 import { FAMILY_RULES } from '../../game/rules'
@@ -111,6 +112,15 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     return () => clearTimeout(timer)
   }, [state, busy, rng, autopilot])
 
+  // On a throw-in every hand is known here: the cards sit in the synthetic tricks.
+  const revealHands = useMemo<Record<number, CardId[]>>(() => {
+    if (state.phase !== 'over' || state.claimedBySeat === null) return {}
+    const synthetic = state.tricks.slice(state.tricks.length - (state.claimedCards?.length ?? 0))
+    const out: Record<number, CardId[]> = {}
+    for (const t of synthetic) for (const p of t.plays) if (p.seat !== state.claimedBySeat) (out[p.seat] ??= []).push(p.card)
+    return out
+  }, [state])
+
   const gameOver: TeamId | null = useMemo(() => {
     if (!finished) return null
     const at = teamsAtTarget(finished.outcome.totals)
@@ -153,6 +163,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
       onNext={nextHand}
       backTo="/play"
       onBusyChange={setBusy}
+      revealHands={revealHands}
     />
   )
 }

@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   limit,
   onSnapshot,
   orderBy,
@@ -53,6 +54,10 @@ export function createFirestoreMatchStore(db: Firestore, uid: string, familyCode
         (snap) => cb(snap.exists() ? ((snap.data().cards as CardId[]) ?? []) : null),
         onError,
       )
+    },
+    async getSeat(matchId, seat) {
+      const snap = await getDoc(seatDoc(matchId, seat))
+      return snap.exists() ? ((snap.data().cards as CardId[]) ?? []) : []
     },
     async createMatch(m: NewMatch) {
       const ref = await addDoc(matches, clean({ ...m, createdAt: Date.now(), updatedAt: Date.now() }))

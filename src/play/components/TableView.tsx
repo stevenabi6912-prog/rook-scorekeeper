@@ -59,14 +59,16 @@ export interface TableViewProps {
   notice?: string | null
   /** Tells the controller when an animation is holding the table (so bots can wait). */
   onBusyChange?: (busy: boolean) => void
+  /** Every seat's remaining cards when the hand ended on a throw-in, by seat (the claimer's come from the state). */
+  revealHands?: Record<number, CardId[]>
 }
 
 const REST_MS = 900
 const SWEEP_MS = 450
-const REVEAL_MS = 2800
+const REVEAL_MS = 4200
 
 export function TableView(props: TableViewProps) {
-  const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange } = props
+  const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange, revealHands } = props
   // A move shows on screen the instant it is made; the server's view replaces
   // it when the next snapshot arrives (or the move is refused).
   const [optimistic, setOptimistic] = useState<HandState | null>(null)
@@ -95,7 +97,9 @@ export function TableView(props: TableViewProps) {
     return () => clearTimeout(t)
   }, [revealKey])
   // Hands recorded before claimedCards existed have none to show.
-  const reveal = revealing && state.claimedBySeat !== null ? { seat: state.claimedBySeat, cards: state.claimedCards ?? [] } : null
+  const reveal = revealing && state.claimedBySeat !== null
+    ? { hands: { ...(revealHands ?? {}), [state.claimedBySeat]: state.claimedCards ?? [] }, claimer: state.claimedBySeat }
+    : null
 
   const busy = sweep !== null || revealing
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange])

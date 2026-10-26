@@ -68,6 +68,9 @@ export function createLocalMatchStore(familyCode: string): MatchStore {
     subscribeSeat(matchId, seat, cb) {
       return listen(() => cb(data.seats[matchId]?.[seat] ?? null))
     },
+    async getSeat(matchId, seat) {
+      return data.seats[matchId]?.[seat] ?? []
+    },
     async createMatch(m: NewMatch) {
       const match: MatchDoc = { ...m, id: id(), createdAt: Date.now(), updatedAt: Date.now() }
       data = { ...data, matches: { ...data.matches, [match.id]: match } }
