@@ -47,6 +47,7 @@
   touch-action: manipulation;
 }
 .table-top {
+  position: relative; z-index: 80; /* stays reachable above the hand summary */
   display: flex; align-items: center; gap: 8px;
   padding: calc(env(safe-area-inset-top) + 6px) 10px 6px;
   background: rgba(0, 0, 0, 0.22); backdrop-filter: blur(6px);

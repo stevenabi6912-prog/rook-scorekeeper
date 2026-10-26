@@ -249,17 +249,31 @@ export function TableView(props: TableViewProps) {
   const legal = state.phase === 'playing' && myTurn ? legalPlays(state, me) : prePlay ? playableCards(state, me) : exchanging ? state.hands[me] : []
   const bidOptions: BidAction[] = state.phase === 'bidding' && myTurn ? legalBids(state, me) : []
 
-  // A queued card stays lifted when your turn comes, ready for the confirming
-  // tap (or the Play button); it is only dropped if the lead made it illegal.
-  const queued = prePlay || (myTurn && state.phase === 'playing') ? selected[0] ?? null : null
+  // The queue tap is the tap: a card lined up while waiting plays by itself the
+  // moment your turn comes, if the lead left it legal. A card picked on your
+  // own turn still takes a second tap (or Play) to confirm.
+  const queuedRef = useRef<CardId | null>(null)
   useEffect(() => {
-    if (!myTurn || state.phase !== 'playing' || !queued) return
-    if (!legalPlays(state, me).includes(queued)) {
+    if (prePlay) queuedRef.current = selected[0] ?? null
+    else if (!myTurn) queuedRef.current = null
+  }, [prePlay, myTurn, selected])
+  useEffect(() => {
+    if (!myTurn || state.phase !== 'playing') return
+    const card = queuedRef.current
+    if (!card) return
+    queuedRef.current = null
+    if (!legalPlays(state, me).includes(card)) {
       setSelected([])
-      setToast(`${cardLabel(queued)} is not legal for this trick`)
+      setToast(`${cardLabel(card)} is not legal for this trick`)
+      return
     }
+    const t = setTimeout(() => {
+      setSelected([])
+      run({ type: 'play', seat: me, card })
+    }, 250)
+    return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myTurn, state.phase, queued, decisionKey])
+  }, [myTurn, state.phase, decisionKey])
 
   const onSelect = (card: CardId) => {
     unlockAudio()
