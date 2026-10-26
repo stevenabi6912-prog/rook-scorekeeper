@@ -4,11 +4,13 @@ import type { Rng } from '../../game/rng'
 import { toHandInput } from '../../game/score'
 import type { DataStore } from '../../data/store'
 import { currentTotals, scoreHand, teamsAtTarget } from '../../lib/scoring'
-import type { Game, Hand } from '../../lib/types'
+import type { Game, Hand, TeamId } from '../../lib/types'
 import { commitMove } from './moves'
 import type { MatchStore } from './store'
 import type { MatchDoc } from './types'
 import { toState } from './view'
+import { describeAction, describeResult } from './events'
+import { summarizeHand } from '../../game/score'
 
 /*
  * What the host's phone does for the table, because nothing runs on a
@@ -33,8 +35,12 @@ export function useHostDuties(opts: {
   hands: Hand[] | null
   rng: Rng
   turnLimitMs: number
+  /** Writes a line to the table's event log. */
+  onEvent?: (seat: number | null, text: string) => void
+  seatNames?: string[]
+  teamNames?: Record<TeamId, string>
 }) {
-  const { matchStore, dataStore, match, game, hands, rng, turnLimitMs } = opts
+  const { matchStore, dataStore, match, game, hands, rng, turnLimitMs, onEvent, seatNames, teamNames } = opts
   const isHost = !!match && match.hostUid === matchStore.uid
   const scoringRef = useRef<number | null>(null)
   // When this phone first saw each decision, so the takeover clock does not
@@ -52,12 +58,22 @@ export function useHostDuties(opts: {
     const sinceSeen = Date.now() - seenRef.current.at
     const delay = info.bot ? BOT_DELAY_MS + rng() * 500 : Math.max(0, turnLimitMs + GRACE_MS - sinceSeen)
     const timer = setTimeout(() => {
-      commitMove(matchStore, match.id, seat, (state) => botDecision(state, seat, rng, info.bot ? {} : { overshootAccept: false })).catch(() => {
-        /* another phone moved first, or the move was refused; the next snapshot re-evaluates */
+      let before: Parameters<typeof describeAction>[0] | null = null
+      commitMove(matchStore, match.id, seat, (state) => {
+        before = state
+        return botDecision(state, seat, rng, info.bot ? {} : { overshootAccept: false })
       })
+        .then((action) => {
+          if (!action || !before || !onEvent || !seatNames) return
+          const line = describeAction(before, action, seatNames)
+          if (line) onEvent(seat, info.bot ? line : `${line} (the table played for them)`)
+        })
+        .catch(() => {
+          /* another phone moved first, or the move was refused; the next snapshot re-evaluates */
+        })
     }, delay)
     return () => clearTimeout(timer)
-  }, [isHost, match, matchStore, rng, turnLimitMs])
+  }, [isHost, match, matchStore, rng, turnLimitMs, onEvent, seatNames])
 
   // A finished hand goes to the scorekeeper exactly once; the game ends at 500.
   useEffect(() => {
@@ -74,7 +90,10 @@ export function useHostDuties(opts: {
     ;(async () => {
       try {
         // Skip the write if an earlier attempt already landed (the page reloaded mid-way).
-        if (!hands.some((h) => h.handNumber === skHand)) await dataStore.addHand(game.id, input)
+        if (!hands.some((h) => h.handNumber === skHand)) {
+          await dataStore.addHand(game.id, input)
+          if (onEvent && teamNames) onEvent(null, describeResult(summarizeHand(state), match.handNumber, teamNames))
+        }
         const at = teamsAtTarget(after)
         const winner = at.length === 0 ? null : at.length === 1 ? at[0] : after.A >= after.B ? 'A' : 'B'
         await matchStore.transact(match.id, async (tx) => {
@@ -86,7 +105,7 @@ export function useHostDuties(opts: {
         scoringRef.current = null
       }
     })()
-  }, [isHost, match, game, hands, dataStore, matchStore])
+  }, [isHost, match, game, hands, dataStore, matchStore, onEvent, teamNames])
 
   return { isHost }
 }

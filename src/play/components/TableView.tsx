@@ -12,6 +12,7 @@ import { audioResume, isMuted, setMuted, sounds, unlockAudio } from '../sound'
 import { HandFan } from './Hand'
 import { BidPanel, HandSummary, KittyPanel, OvershootPanel, TrumpChip, TrumpPanel } from './Panels'
 import { SeatBadge, Table, type SeatInfo, type Sweep } from './Table'
+import { ChatPanel, type ChatApi } from './ChatPanel'
 import '../play.css'
 
 /*
@@ -61,14 +62,17 @@ export interface TableViewProps {
   onBusyChange?: (busy: boolean) => void
   /** Every seat's remaining cards when the hand ended on a throw-in, by seat (the claimer's come from the state). */
   revealHands?: Record<number, CardId[]>
+  /** Table chat, when the table has one. */
+  chat?: ChatApi
 }
 
+const NO_MESSAGES: ChatApi['messages'] = []
 const REST_MS = 900
 const SWEEP_MS = 450
 const REVEAL_MS = 4200
 
 export function TableView(props: TableViewProps) {
-  const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange, revealHands } = props
+  const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange, revealHands, chat } = props
   // A move shows on screen the instant it is made; the server's view replaces
   // it when the next snapshot arrives (or the move is refused).
   const [optimistic, setOptimistic] = useState<HandState | null>(null)
@@ -306,7 +310,37 @@ export function TableView(props: TableViewProps) {
     run({ type: 'discard', seat: me, cards })
   }
 
-  const bubbles = useMemo(() => bubblesFor(state, busy, me), [state, busy, me])
+  // Chat: open/closed, unread count, the newest line as a bubble by its seat, and a pop for incoming lines.
+  const [chatOpen, setChatOpen] = useState(false)
+  const [seenCount, setSeenCount] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+  const chatMessages = chat?.messages
+  const messages = useMemo(() => chatMessages ?? NO_MESSAGES, [chatMessages])
+  const lastMsgRef = useRef<string | null>(null)
+  useEffect(() => {
+    const last = messages[messages.length - 1]
+    if (!last || lastMsgRef.current === last.id) return
+    const first = lastMsgRef.current === null
+    lastMsgRef.current = last.id
+    if (!first && last.kind !== 'event' && !(last.uid === chat?.myUid && last.seat === chat?.mySeat)) sounds.message()
+    setNow(Date.now())
+    const t = setTimeout(() => setNow(Date.now()), 5200)
+    return () => clearTimeout(t)
+  }, [messages, chat?.myUid, chat?.mySeat])
+  useEffect(() => {
+    if (chatOpen) setSeenCount(messages.length)
+  }, [chatOpen, messages.length])
+  const unread = Math.max(0, messages.filter((m) => m.kind !== 'event').length - seenCount)
+  const chatBubbles = useMemo(() => {
+    const out: Record<number, ReactNode> = {}
+    for (const m of messages.slice(-6)) {
+      if (m.kind === 'event' || m.seat === null || now - m.createdAt > 5000) continue
+      out[m.seat] = m.kind === 'voice' ? '🎤' : m.text.length > 28 ? m.text.slice(0, 26) + '…' : m.text
+    }
+    return out
+  }, [messages, now])
+
+  const bubbles = useMemo(() => ({ ...bubblesFor(state, busy, me), ...chatBubbles }), [state, busy, me, chatBubbles])
   const status = prePlay && selected[0] ? `Queued: ${cardLabel(selected[0])}` : statusText(state, myTurn, busy, selected, seats, me)
   const live = tallies(state)
   const bidLabel = state.bid === null
@@ -327,6 +361,11 @@ export function TableView(props: TableViewProps) {
         </div>
         {(state.bid !== null || state.bidding.highBid !== null) && <span className="top-chip">{bidLabel}</span>}
         <TrumpChip trump={state.trump} />
+        {chat && (
+          <button type="button" className="icon-btn light chat-btn" aria-label={`Chat${unread ? `, ${unread} unread` : ''}`} onClick={() => setChatOpen(true)}>
+            💬{unread > 0 && <span className="chat-badge">{unread}</span>}
+          </button>
+        )}
         <button
           type="button"
           className="icon-btn light"
@@ -410,6 +449,8 @@ export function TableView(props: TableViewProps) {
       </div>
 
       {toast && <div className="toast">{toast}</div>}
+
+      {chat && <ChatPanel chat={chat} seats={seats} open={chatOpen} onClose={() => setChatOpen(false)} />}
 
       {showSummary && finished && (
         <HandSummary

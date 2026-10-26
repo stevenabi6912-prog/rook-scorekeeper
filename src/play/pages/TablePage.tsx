@@ -17,6 +17,9 @@ import { scorekeeperHandNumber, useHostDuties } from '../match/host'
 import { claimSeat, commitMove, dealNextHand, mySeats, releaseSeat, seatBots, seatsFilled, setMatchStatus } from '../match/moves'
 import type { MatchDoc } from '../match/types'
 import { toState } from '../match/view'
+import { describeAction } from '../match/events'
+import type { ChatMessage } from '../match/types'
+import type { ChatApi } from '../components/ChatPanel'
 import { joinNames, TURN_LIMIT_MS } from './DemoTablePage'
 import '../play.css'
 
@@ -47,7 +50,19 @@ export function TablePage() {
   const [activeSeat, setActiveSeat] = useState<number | null>(null)
   const me = activeSeat !== null && seatsHeld.includes(activeSeat) ? activeSeat : (seatsHeld[0] ?? null)
 
-  const { isHost } = useHostDuties({ matchStore, dataStore, match: match ?? null, game, hands, rng, turnLimitMs: TURN_LIMIT_MS })
+  const seatNames = useMemo(() => (match?.seats ?? []).map((s) => byId.get(s.playerId)?.name ?? 'Player'), [match, byId])
+  const { isHost } = useHostDuties({
+    matchStore,
+    dataStore,
+    match: match ?? null,
+    game,
+    hands,
+    rng,
+    turnLimitMs: TURN_LIMIT_MS,
+    onEvent: (seat, text) => matchStore.sendMessage(match!.id, { uid: matchStore.uid, seat, kind: 'event', text }).catch(() => undefined),
+    seatNames,
+    teamNames: game ? { A: game.teams.A.name, B: game.teams.B.name } : { A: 'Team A', B: 'Team B' },
+  })
 
   const seats: SeatInfo[] = useMemo(
     () =>
@@ -220,6 +235,22 @@ function LiveTable({
   const [params] = useSearchParams()
   /** `?auto`: this phone decides for its own seat with the bot logic (watching, testing). */
   const autopilot = params.has('auto')
+
+  // Table chat.
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  useEffect(() => matchStore.subscribeMessages(match.id, setMessages, () => undefined), [matchStore, match.id])
+  const chat = useMemo<ChatApi>(
+    () => ({
+      messages,
+      mySeat: me,
+      myUid: matchStore.uid,
+      send: (m) => {
+        if (m.kind === 'voice' && !m.audio) throw new Error('That voice note was too long to send. Keep it under ten seconds.')
+        return matchStore.sendMessage(match.id, { ...m, uid: matchStore.uid, seat: me })
+      },
+    }),
+    [messages, me, matchStore, match.id],
+  )
   const [cards, setCards] = useState<CardId[] | null>(null)
   useEffect(() => {
     setCards(null)
@@ -281,9 +312,12 @@ function LiveTable({
 
   const act = useCallback(
     async (action: Action) => {
+      const before = toState(match.pub!, me, cards ?? [])
       await commitMove(matchStore, match.id, me, () => action)
+      const line = describeAction(before, action, seats.map((s) => s.name))
+      if (line) matchStore.sendMessage(match.id, { uid: matchStore.uid, seat: me, kind: 'event', text: line }).catch(() => undefined)
     },
-    [matchStore, match.id, me],
+    [matchStore, match.id, me, match.pub, cards, seats],
   )
 
   const turnSeat = match.seats[pub.turnSeat]
@@ -311,6 +345,7 @@ function LiveTable({
         backTo="/play"
         notice={notice}
         revealHands={revealHands}
+        chat={chat}
       />
       {seatsHeld.length > 1 && (
         <div className="seat-switcher" role="tablist" aria-label="Your seats">

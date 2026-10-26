@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { botDecision } from '../../game/bots'
 import type { CardId } from '../../game/cards'
@@ -10,6 +10,9 @@ import { scoreHand, teamsAtTarget, type Scores } from '../../lib/scoring'
 import type { Handedness, TeamId } from '../../lib/types'
 import type { SeatInfo } from '../components/Table'
 import { TableView, type Finished } from '../components/TableView'
+import type { ChatApi } from '../components/ChatPanel'
+import { describeAction, describeResult } from '../match/events'
+import type { ChatMessage } from '../match/types'
 import { sounds } from '../sound'
 
 /*
@@ -83,11 +86,24 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
   const [state, setState] = useState<HandState>(() => newHand(last))
   const [busy, setBusy] = useState(false)
 
+  // Local chat for the practice table: your lines, plus the event log.
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const post = useCallback((m: Omit<ChatMessage, 'id' | 'createdAt'>) => {
+    setMessages((list) => [...list, { ...m, id: Math.random().toString(36).slice(2), createdAt: Date.now() }].slice(-200))
+  }, [])
+  const chat = useMemo<ChatApi>(
+    () => ({ messages, mySeat: ME, myUid: 'me', send: (m) => post({ ...m, uid: 'me', seat: ME }) }),
+    [messages, post],
+  )
+  const names = useMemo(() => seats.map((s) => s.name), [seats])
+
   const act = useCallback((action: Action) => {
     const r = applyAction(state, action)
     if (!r.ok) throw new Error(r.error)
     setState(r.state)
-  }, [state])
+    const line = describeAction(state, action, names)
+    if (line) post({ uid: 'me', seat: action.seat, kind: 'event', text: line })
+  }, [state, names, post])
 
   // Score the hand the moment it ends; the view shows it after the last sweep.
   const finished = useMemo<Finished | null>(() => {
@@ -106,11 +122,15 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
       const action = botDecision(state, seat, rng)
       if (action) {
         const r = applyAction(state, action)
-        if (r.ok) setState(r.state)
+        if (r.ok) {
+          setState(r.state)
+          const line = describeAction(state, action, names)
+          if (line) post({ uid: 'bot', seat, kind: 'event', text: line })
+        }
       }
     }, BOT_DELAY + rng() * 500)
     return () => clearTimeout(timer)
-  }, [state, busy, rng, autopilot])
+  }, [state, busy, rng, autopilot, names, post])
 
   // On a throw-in every hand is known here: the cards sit in the synthetic tricks.
   const revealHands = useMemo<Record<number, CardId[]>>(() => {
@@ -128,6 +148,13 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
     if (at.length === 1) return at[0]
     return finished.outcome.totals.A >= finished.outcome.totals.B ? 'A' : 'B'
   }, [finished])
+
+  const resultLogged = useRef<number>(0)
+  useEffect(() => {
+    if (!finished || resultLogged.current === handNumber) return
+    resultLogged.current = handNumber
+    post({ uid: 'table', seat: null, kind: 'event', text: describeResult(finished.result, handNumber, teamNames) })
+  }, [finished, handNumber, teamNames, post])
 
   const nextHand = () => {
     if (!finished) return
@@ -164,6 +191,7 @@ function DemoTable({ cfg }: { cfg: TableConfig }) {
       backTo="/play"
       onBusyChange={setBusy}
       revealHands={revealHands}
+      chat={chat}
     />
   )
 }
