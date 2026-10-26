@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { botDecision } from '../../game/bots'
 import type { CardId } from '../../game/cards'
-import { applyAction, canClaimRest, legalBids, legalPlays, type Action, type BidAction, type HandState } from '../../game/engine'
+import { cardLabel } from './Card'
+import { applyAction, canClaimRest, legalBids, legalPlays, playableCards, type Action, type BidAction, type HandState } from '../../game/engine'
 import type { Rng } from '../../game/rng'
 import { tallies, type HandResult } from '../../game/score'
 import type { HandOutcome, Scores } from '../../lib/scoring'
@@ -244,13 +245,36 @@ export function TableView(props: TableViewProps) {
 
   const exchanging = state.phase === 'nest' && myTurn && state.nestPickedUp > 0
   const claimable = myTurn && canClaimRest(state, me)
-  const legal = state.phase === 'playing' && myTurn ? legalPlays(state, me) : exchanging ? state.hands[me] : []
+  // Pre-play: while waiting on others you can line up the card you mean to play.
+  const prePlay = state.phase === 'playing' && !myTurn && !busy && !autopilot && finished === null && state.turnSeat !== me
+  const legal = state.phase === 'playing' && myTurn ? legalPlays(state, me) : prePlay ? playableCards(state, me) : exchanging ? state.hands[me] : []
   const bidOptions: BidAction[] = state.phase === 'bidding' && myTurn ? legalBids(state, me) : []
+
+  // A queued card plays itself the moment it is your turn, if it is still legal.
+  const queued = prePlay || (myTurn && state.phase === 'playing') ? selected[0] ?? null : null
+  useEffect(() => {
+    if (!myTurn || state.phase !== 'playing' || !queued) return
+    if (!legalPlays(state, me).includes(queued)) {
+      setSelected([])
+      setToast(`${cardLabel(queued)} is not legal for this trick`)
+      return
+    }
+    const t = setTimeout(() => {
+      setSelected([])
+      run({ type: 'play', seat: me, card: queued })
+    }, 250)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTurn, state.phase, queued, decisionKey])
 
   const onSelect = (card: CardId) => {
     unlockAudio()
     if (exchanging) {
       setSelected((sel) => (sel.includes(card) ? sel.filter((c) => c !== card) : sel.length < state.nestPickedUp ? [...sel, card] : sel))
+      return
+    }
+    if (prePlay) {
+      setSelected((sel) => (sel[0] === card ? [] : [card]))
       return
     }
     if (selected[0] === card) {
@@ -271,7 +295,7 @@ export function TableView(props: TableViewProps) {
   }
 
   const bubbles = useMemo(() => bubblesFor(state, busy, me), [state, busy, me])
-  const status = statusText(state, myTurn, busy, selected, seats, me)
+  const status = prePlay && selected[0] ? `Queued: ${cardLabel(selected[0])}` : statusText(state, myTurn, busy, selected, seats, me)
   const live = tallies(state)
   const bidLabel = state.bid === null
     ? state.bidding.highBid === null ? 'No bid' : `${state.bidding.highBid === 'moon' ? 'Moon' : state.bidding.highBid} · ${seats[state.bidding.highSeat!].name}`
@@ -357,7 +381,7 @@ export function TableView(props: TableViewProps) {
           legal={legal}
           selected={selected}
           onSelect={onSelect}
-          disabled={!(state.phase === 'playing' || exchanging) || !myTurn}
+          disabled={!((state.phase === 'playing' && (myTurn || prePlay)) || exchanging)}
         />
       </div>
 

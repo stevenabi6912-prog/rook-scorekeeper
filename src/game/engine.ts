@@ -327,7 +327,17 @@ function applyTrump(state: HandState, seat: number, trump: Suit): Result {
  * while you still hold that color). Void: anything.
  */
 export function legalPlays(state: HandState, seat: number): CardId[] {
-  if (state.phase !== 'playing' || state.turnSeat !== seat || state.trump === null) return []
+  if (state.turnSeat !== seat) return []
+  return playableCards(state, seat)
+}
+
+/**
+ * Cards `seat` could play to the current trick if it were their turn: what a
+ * player may line up in advance while waiting. Before anyone has led, that
+ * is the whole hand.
+ */
+export function playableCards(state: HandState, seat: number): CardId[] {
+  if (state.phase !== 'playing' || state.trump === null) return []
   const hand = state.hands[seat]
   const lead = state.trick.plays[0]
   if (!lead) return [...hand]
