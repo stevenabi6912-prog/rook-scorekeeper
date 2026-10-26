@@ -92,11 +92,16 @@ export async function releaseSeat(store: MatchStore, matchId: string, seat: numb
   })
 }
 
-/** Host: put a bot in a seat (or every empty seat). */
+/**
+ * Host: put a bot in a seat, or in every empty seat. During a game this also
+ * takes a seat away from a person who has gone missing; they can take it
+ * back from the seating screen when they return.
+ */
 export async function seatBots(store: MatchStore, matchId: string, seat?: number): Promise<void> {
   await store.transact(matchId, async (tx) => {
     const match = await tx.getMatch()
     if (match.hostUid !== store.uid) throw new Error('Only the host seats bots.')
+    if (seat !== undefined && match.seats[seat]?.uid === store.uid) throw new Error('The host cannot hand their own seat to a bot.')
     const seats = match.seats.map((s, i) => ((seat === undefined ? s.uid === null && !s.bot : i === seat) ? { ...s, uid: null, bot: true } : s))
     tx.setMatch({ seats })
   })

@@ -64,6 +64,8 @@ export interface TableViewProps {
   revealHands?: Record<number, CardId[]>
   /** Table chat, when the table has one. */
   chat?: ChatApi
+  /** Host only: opens the seat controls (hand an absent seat to a bot). */
+  onSeats?: () => void
 }
 
 const NO_MESSAGES: ChatApi['messages'] = []
@@ -72,7 +74,7 @@ const SWEEP_MS = 450
 const REVEAL_MS = 4200
 
 export function TableView(props: TableViewProps) {
-  const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange, revealHands, chat } = props
+  const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange, revealHands, chat, onSeats } = props
   // A move shows on screen the instant it is made; the server's view replaces
   // it when the next snapshot arrives (or the move is refused).
   const [optimistic, setOptimistic] = useState<HandState | null>(null)
@@ -361,6 +363,9 @@ export function TableView(props: TableViewProps) {
         </div>
         {(state.bid !== null || state.bidding.highBid !== null) && <span className="top-chip">{bidLabel}</span>}
         <TrumpChip trump={state.trump} />
+        {onSeats && (
+          <button type="button" className="icon-btn light" aria-label="Seats" onClick={onSeats}>👥</button>
+        )}
         {chat && (
           <button type="button" className="icon-btn light chat-btn" aria-label={`Chat${unread ? `, ${unread} unread` : ''}`} onClick={() => setChatOpen(true)}>
             💬{unread > 0 && <span className="chat-badge">{unread}</span>}

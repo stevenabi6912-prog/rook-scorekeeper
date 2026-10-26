@@ -169,7 +169,7 @@ function Seating({
   return (
     <Gate title={inPlay ? 'Table in play' : 'Take your seats'}>
       {match.status === 'abandoned' && <div className="notice">The host closed this table.</div>}
-      {inPlay && mine.length === 0 && <div className="notice">This table is already playing. Take a free seat to join, or ask the host to free yours.</div>}
+      {inPlay && mine.length === 0 && <div className="notice">This table is already playing. Take a free seat, or take over a bot's seat if the host handed yours to one while you were away.</div>}
       <section className="section">
         <div className="list">
           {match.seats.map((s, i) => {
@@ -188,6 +188,7 @@ function Seating({
                   </div>
                 </div>
                 {!taken && <button type="button" className="btn small primary" onClick={() => onClaim(i)}>That's me</button>}
+                {inPlay && s.bot && mine.length === 0 && <button type="button" className="btn small primary" onClick={() => onClaim(i)}>Take over from the bot</button>}
                 {isMine && !inPlay && <button type="button" className="btn small" onClick={() => onRelease(i)}>Leave</button>}
                 {isHost && !isMine && taken && !inPlay && <button type="button" className="btn small" onClick={() => onRelease(i)}>Free</button>}
                 {isHost && !taken && <button type="button" className="btn small" onClick={() => onBots(i)}>Bot</button>}
@@ -320,6 +321,7 @@ function LiveTable({
     [matchStore, match.id, me, match.pub, cards, seats],
   )
 
+  const [seatsOpen, setSeatsOpen] = useState(false)
   const turnSeat = match.seats[pub.turnSeat]
   const notice =
     pub.phase !== 'over' && turnSeat.bot && !isHost ? `${hostName}'s phone moves the bots` : seatsHeld.length > 1 ? `You hold ${seatsHeld.length} seats on this phone` : null
@@ -346,7 +348,35 @@ function LiveTable({
         notice={notice}
         revealHands={revealHands}
         chat={chat}
+        onSeats={isHost ? () => setSeatsOpen(true) : undefined}
       />
+      {seatsOpen && (
+        <div className="chat-backdrop" onClick={() => setSeatsOpen(false)}>
+          <div className="chat-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Seats">
+            <div className="chat-head">
+              <strong>Seats</strong>
+              <button type="button" className="icon-btn" onClick={() => setSeatsOpen(false)} aria-label="Close">✕</button>
+            </div>
+            <div className="list" style={{ padding: '0 12px 12px' }}>
+              {match.seats.map((s, i) => (
+                <div key={i} className={`seat team-${s.team}`}>
+                  <span className="seat-no">{i + 1}</span>
+                  <div className="grow">
+                    <div><strong>{seats[i].name}</strong></div>
+                    <div className="small muted">{s.uid === matchStore.uid ? 'You' : s.bot ? '🤖 Bot' : s.uid ? '📱 On a phone' : 'Open'}</div>
+                  </div>
+                  {!s.bot && s.uid !== matchStore.uid && (
+                    <button type="button" className="btn small" onClick={() => seatBots(matchStore, match.id, i).catch(() => undefined)}>
+                      Hand to a bot
+                    </button>
+                  )}
+                </div>
+              ))}
+              <p className="small muted">A seat handed to a bot keeps playing; the person takes it back from the Play tab when they return.</p>
+            </div>
+          </div>
+        </div>
+      )}
       {seatsHeld.length > 1 && (
         <div className="seat-switcher" role="tablist" aria-label="Your seats">
           {seatsHeld.map((s) => (
