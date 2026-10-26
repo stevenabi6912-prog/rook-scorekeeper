@@ -249,20 +249,15 @@ export function TableView(props: TableViewProps) {
   const legal = state.phase === 'playing' && myTurn ? legalPlays(state, me) : prePlay ? playableCards(state, me) : exchanging ? state.hands[me] : []
   const bidOptions: BidAction[] = state.phase === 'bidding' && myTurn ? legalBids(state, me) : []
 
-  // A queued card plays itself the moment it is your turn, if it is still legal.
+  // A queued card stays lifted when your turn comes, ready for the confirming
+  // tap (or the Play button); it is only dropped if the lead made it illegal.
   const queued = prePlay || (myTurn && state.phase === 'playing') ? selected[0] ?? null : null
   useEffect(() => {
     if (!myTurn || state.phase !== 'playing' || !queued) return
     if (!legalPlays(state, me).includes(queued)) {
       setSelected([])
       setToast(`${cardLabel(queued)} is not legal for this trick`)
-      return
     }
-    const t = setTimeout(() => {
-      setSelected([])
-      run({ type: 'play', seat: me, card: queued })
-    }, 250)
-    return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myTurn, state.phase, queued, decisionKey])
 
