@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { botDecision } from '../../game/bots'
 import { Avatar, playerColor } from '../../components/Avatar'
@@ -33,6 +33,9 @@ import '../play.css'
  * the bots, the timeouts, and the scorekeeper writes (useHostDuties).
  */
 
+/** How long the final hand's reveal and summary stay up before the Game over card (reveal 4.2 s + about 5 s to read). */
+const LAST_HAND_HOLD_MS = 9500
+
 export function TablePage() {
   const { matchId = '' } = useParams()
   // Waiting for the deal counts too: the screen stays on from the seating screen onward.
@@ -46,6 +49,22 @@ export function TablePage() {
   const { game } = useGame(match?.gameId)
   const { hands } = useHands(match?.gameId)
   const rng = useMemo(() => seededRng(randomSeed()), [])
+
+  // When the game ends under this phone's feet, the last hand stays on screen
+  // (the throw-in reveal, then the summary) before the Game over card.
+  const [holdUntil, setHoldUntil] = useState(0)
+  const [, setHoldTick] = useState(0)
+  const prevStatusRef = useRef<string | null>(null)
+  const status = match?.status ?? null
+  useEffect(() => {
+    const prev = prevStatusRef.current
+    prevStatusRef.current = status
+    if (prev !== 'playing' || status !== 'finished') return
+    setHoldUntil(Date.now() + LAST_HAND_HOLD_MS)
+    const t = setTimeout(() => setHoldTick((n) => n + 1), LAST_HAND_HOLD_MS + 50)
+    return () => clearTimeout(t)
+  }, [status])
+  const holdingLastHand = status === 'finished' && Date.now() < holdUntil
 
   useEffect(() => {
     setMatch(undefined)
@@ -148,7 +167,7 @@ export function TablePage() {
     )
   }
 
-  if (match.status === 'finished') {
+  if (match.status === 'finished' && !holdingLastHand) {
     return (
       <Gate title="Game over">
         <div className="card center">
