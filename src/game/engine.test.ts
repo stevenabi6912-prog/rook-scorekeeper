@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TeamId } from '../lib/types'
 import { botDiscard } from './bots'
-import { ROOK, type CardId } from './cards'
+import { ROOK, cardPoints, type CardId } from './cards'
 import type { Deal } from './deal'
 import {
   UNKNOWN,
@@ -558,41 +558,41 @@ describe('playing a hand', () => {
   })
 
   it('scores the hidden Kitty right when the last card played is a point card', () => {
-    // Full deck so "what is left of 120" is meaningful: seat 0 plays with everything else hidden.
-    const full = startHand({ rules: R, handedness: 4, teams: TEAMS4, dealerSeat: 3, seed: 'hidden-kitty' })
-    // Play the whole hand with all cards known, then replay the final play with
-    // other hands and the Kitty hidden, as a phone online would see it.
+    // Play full hands until one ends on a point card, then replay that final
+    // play from the mover's hidden view (other hands and the Kitty unknown), as
+    // a phone online sees it. Every point must still be accounted for.
     const rng = seededRng('hk')
-    let s = full
-    while (s.phase === 'bidding' || s.phase === 'overshoot') {
-      if (s.phase === 'overshoot') s = mustApply(s, { type: 'overshoot', seat: s.dealerSeat, accept: false })
-      else {
-        const o = legalBids(s, s.turnSeat)
-        s = mustApply(s, bid(s.turnSeat, o[0]))
+    let checked = 0
+    for (let seed = 0; seed < 60 && checked < 3; seed++) {
+      let s = startHand({ rules: R, handedness: 4, teams: TEAMS4, dealerSeat: seed % 4, seed: `hidden-${seed}` })
+      while (s.phase === 'bidding' || s.phase === 'overshoot') {
+        if (s.phase === 'overshoot') s = mustApply(s, { type: 'overshoot', seat: s.dealerSeat, accept: false })
+        else s = mustApply(s, bid(s.turnSeat, legalBids(s, s.turnSeat)[0]))
       }
+      s = mustApply(s, { type: 'pickup', seat: s.bidderSeat! })
+      s = mustApply(s, { type: 'discard', seat: s.bidderSeat!, cards: botDiscard(s, s.bidderSeat!) })
+      s = mustApply(s, { type: 'trump', seat: s.bidderSeat!, trump: 'red' })
+      let before = s
+      let lastCard: CardId = ''
+      while (s.phase === 'playing') {
+        before = s
+        const options = legalPlays(s, s.turnSeat)
+        lastCard = options[Math.floor(rng() * options.length)]
+        s = mustApply(s, play(s.turnSeat, lastCard))
+      }
+      if (cardPoints(lastCard, R) === 0) continue
+      checked++
+      expect(s.tricks.reduce((n, t) => n + t.points, 0)).toBe(120)
+      const mover = before.turnSeat
+      const hidden = {
+        ...before,
+        hands: before.hands.map((h, i) => (i === mover ? h : h.map(() => UNKNOWN))),
+        nest: before.nest.map(() => UNKNOWN),
+      }
+      const last = mustApply(hidden, play(mover, lastCard))
+      expect(last.tricks.reduce((n, t) => n + t.points, 0)).toBe(120)
     }
-    s = mustApply(s, { type: 'pickup', seat: s.bidderSeat! })
-    s = mustApply(s, { type: 'discard', seat: s.bidderSeat!, cards: botDiscard(s, s.bidderSeat!) })
-    s = mustApply(s, { type: 'trump', seat: s.bidderSeat!, trump: 'red' })
-    let before = s
-    while (s.phase === 'playing') {
-      before = s
-      const options = legalPlays(s, s.turnSeat)
-      // On the very last play prefer a point card, the case that went wrong.
-      const pointy = options.find((c) => c === ROOK || /^[RYGB](5|10|14)$/.test(c))
-      s = mustApply(s, play(s.turnSeat, pointy && s.hands.every((h) => h.length <= 1) ? pointy : options[Math.floor(rng() * options.length)]))
-    }
-    const known = s.tricks.reduce((n, t) => n + t.points, 0)
-    expect(known).toBe(120)
-    // Now the same final play from the mover's hidden view.
-    const mover = before.turnSeat
-    const hidden = {
-      ...before,
-      hands: before.hands.map((h, i) => (i === mover ? h : h.map(() => UNKNOWN))),
-      nest: before.nest.map(() => UNKNOWN),
-    }
-    const last = mustApply(hidden, play(mover, before.hands[mover][0]))
-    expect(last.tricks.reduce((n, t) => n + t.points, 0)).toBe(120)
+    expect(checked).toBeGreaterThan(0)
   })
 
   it('a broken Moon plays on by default but can end the hand early', () => {
