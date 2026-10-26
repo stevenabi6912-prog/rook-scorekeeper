@@ -13,6 +13,7 @@ import { HandFan } from './Hand'
 import { BidPanel, HandSummary, KittyPanel, OvershootPanel, TrumpChip, TrumpPanel } from './Panels'
 import { SeatBadge, Table, type SeatInfo, type Sweep } from './Table'
 import { ChatPanel, type ChatApi } from './ChatPanel'
+import { useWakeLock } from '../wakeLock'
 import '../play.css'
 
 /*
@@ -75,6 +76,8 @@ const REVEAL_MS = 4200
 
 export function TableView(props: TableViewProps) {
   const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange, revealHands, chat, onSeats } = props
+  // A phone at a table stays awake, so its player does not miss turns.
+  useWakeLock()
   // A move shows on screen the instant it is made; the server's view replaces
   // it when the next snapshot arrives (or the move is refused).
   const [optimistic, setOptimistic] = useState<HandState | null>(null)

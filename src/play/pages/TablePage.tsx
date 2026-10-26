@@ -17,6 +17,7 @@ import { scorekeeperHandNumber, useHostDuties } from '../match/host'
 import { claimHost, claimSeat, commitMove, dealNextHand, mySeats, releaseSeat, seatBots, seatsFilled, setMatchStatus } from '../match/moves'
 import { loadIdentity } from '../identity'
 import { useHeartbeat, useWhoIsHere } from '../presence'
+import { useWakeLock } from '../wakeLock'
 import { PRESENCE_STALE_MS } from '../match/types'
 import type { MatchDoc } from '../match/types'
 import { toState } from '../match/view'
@@ -34,6 +35,8 @@ import '../play.css'
 
 export function TablePage() {
   const { matchId = '' } = useParams()
+  // Waiting for the deal counts too: the screen stays on from the seating screen onward.
+  useWakeLock()
   const matchStore = useMatchStore()
   const dataStore = useStore()
   const navigate = useNavigate()
