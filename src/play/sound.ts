@@ -71,8 +71,21 @@ export function audioReady(): boolean {
 }
 
 function audio(): AudioContext | null {
-  if (muted || !ctx || ctx.state !== 'running') return null
+  if (muted || !ctx) return null
+  // Sounds scheduled while the engine is still waking play once it is running.
+  if (ctx.state !== 'running') void ctx.resume()
   return ctx
+}
+
+/** Resume the engine and report whether the phone says it is running. */
+export async function audioResume(): Promise<'running' | 'blocked' | 'none'> {
+  if (!ctx) return 'none'
+  try {
+    await ctx.resume()
+  } catch {
+    /* ignore */
+  }
+  return ctx.state === 'running' ? 'running' : 'blocked'
 }
 
 function noise(c: AudioContext): AudioBuffer {

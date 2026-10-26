@@ -8,7 +8,7 @@ import type { Rng } from '../../game/rng'
 import { tallies, type HandResult } from '../../game/score'
 import type { HandOutcome, Scores } from '../../lib/scoring'
 import type { TeamId } from '../../lib/types'
-import { isMuted, setMuted, sounds, unlockAudio } from '../sound'
+import { audioResume, isMuted, setMuted, sounds, unlockAudio } from '../sound'
 import { HandFan } from './Hand'
 import { BidPanel, HandSummary, KittyPanel, OvershootPanel, TrumpChip, TrumpPanel } from './Panels'
 import { SeatBadge, Table, type SeatInfo, type Sweep } from './Table'
@@ -332,8 +332,20 @@ export function TableView(props: TableViewProps) {
             const next = !muted
             setMuted(next)
             setMutedState(next)
-            // A chime on unmute, so you can hear at once whether sound works on this phone.
-            if (!next) setTimeout(() => sounds.yourTurn(), 50)
+            // A chime on unmute, once the engine is awake, so you can hear at once
+            // whether sound works on this phone; and a note about what the phone reports.
+            if (!next) {
+              audioResume().then((status) => {
+                sounds.yourTurn()
+                setToast(
+                  status === 'running'
+                    ? 'Sound on. If you hear nothing, check the ring/silent switch on the side of the phone.'
+                    : status === 'blocked'
+                      ? 'This phone is blocking audio right now. Try the ring/silent switch, then tap again.'
+                      : 'Tap anywhere on the table first, then the speaker.',
+                )
+              })
+            }
           }}
         >
           {muted ? '🔇' : '🔊'}
