@@ -81,6 +81,8 @@ export interface HandState {
   tricks: TakenTrick[]
   /** Seat that threw the cards in to end the hand early, if any. */
   claimedBySeat: number | null
+  /** The cards they threw in (shown face up to everyone). */
+  claimedCards: CardId[]
 }
 
 export type Action =
@@ -149,6 +151,7 @@ export function startHandFromDeal(opts: Omit<StartHandOptions, 'seed'>, dealt: D
     trick: { leadSeat: first, plays: [] },
     tricks: [],
     claimedBySeat: null,
+    claimedCards: [],
   }
 }
 
@@ -459,6 +462,7 @@ function applyClaim(state: HandState, seat: number): Result {
   // players' cards are included when known (practice table) and left out when
   // not (online).
   hands[seat].sort((a, b) => strength(b, rules) - strength(a, rules))
+  const claimedCards = [...hands[seat]]
   for (let t = 0; t < remaining; t++) {
     const plays: Play[] = []
     for (let i = 0; i < handedness; i++) {
@@ -472,7 +476,7 @@ function applyClaim(state: HandState, seat: number): Result {
     if (last) points += (tookNest && everythingKnown ? pointsIn(state.nest, rules) : 0) + (everythingKnown ? 0 : hidden)
     tricks.push({ leadSeat: seat, plays, winnerSeat: seat, points, tookNest })
   }
-  return succeed({ ...state, hands, tricks, trick: { leadSeat: seat, plays: [] }, phase: 'over', turnSeat: seat, claimedBySeat: seat })
+  return succeed({ ...state, hands, tricks, trick: { leadSeat: seat, plays: [] }, phase: 'over', turnSeat: seat, claimedBySeat: seat, claimedCards })
 }
 
 /* ------------------------------------------------------------------ reducer */

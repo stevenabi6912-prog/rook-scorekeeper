@@ -62,6 +62,7 @@ export interface TableViewProps {
 
 const REST_MS = 900
 const SWEEP_MS = 450
+const REVEAL_MS = 2800
 
 export function TableView(props: TableViewProps) {
   const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange } = props
@@ -80,7 +81,21 @@ export function TableView(props: TableViewProps) {
   const stateRef = useRef(state)
   stateRef.current = state
 
-  const busy = sweep !== null
+  // Thrown-in cards stay on the table for a moment before the summary.
+  const [revealing, setRevealing] = useState(false)
+  const revealKey = state.claimedBySeat !== null ? `${handNumber}:${state.claimedBySeat}` : ''
+  useEffect(() => {
+    if (!revealKey) {
+      setRevealing(false)
+      return
+    }
+    setRevealing(true)
+    const t = setTimeout(() => setRevealing(false), REVEAL_MS)
+    return () => clearTimeout(t)
+  }, [revealKey])
+  const reveal = revealing && state.claimedBySeat !== null ? { seat: state.claimedBySeat, cards: state.claimedCards } : null
+
+  const busy = sweep !== null || revealing
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange])
 
   const run = (action: Action) => {
@@ -289,7 +304,7 @@ export function TableView(props: TableViewProps) {
         </button>
       </header>
 
-      <Table state={state} me={me} seats={seats} bubbles={bubbles} sweep={sweep} />
+      <Table state={state} me={me} seats={seats} bubbles={bubbles} sweep={sweep} reveal={reveal} />
 
       {myTurn && secondsLeft !== null && (
         <div className="turn-bar" aria-hidden>

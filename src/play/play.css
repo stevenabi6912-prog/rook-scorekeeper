@@ -135,14 +135,17 @@
 .seat-tag.dealer { background: #ffd54a; color: #3a2a00; }
 .seat-tag.bidder { background: #fff; color: #b8860b; }
 
-.kitty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; z-index: 1; opacity: 0.9; }
+.kitty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; z-index: 1; opacity: 0.9; transition: left 0.6s ease, top 0.6s ease; }
 .kitty-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--felt-muted); font-weight: 700; margin-top: 6px; }
 
 .trick-card { position: absolute; transform: translate(-50%, -50%); }
 .trick-card.slide-in { animation: slide-in 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .trick-card.resting { transform: translate(-50%, -50%); }
-.trick-card.winning { transform: translate(-50%, -50%) scale(1.06); z-index: 40 !important; }
-.trick-card.winning .rook-card { box-shadow: 0 0 0 3px #ffd54a, 0 0 24px rgba(255, 213, 74, 0.8); }
+.trick-card.winning { z-index: 40 !important; }
+.trick-card.winning .rook-card { box-shadow: 0 0 0 3px #ffd54a, 0 0 24px rgba(255, 213, 74, 0.8); transition: box-shadow 0.25s ease 0.4s; }
+.trick-card.reveal { animation-duration: 0.6s; }
+.kitty.with-bidder { transform: translate(-50%, -50%) scale(0.9); opacity: 0.85; transition: left 0.6s ease, top 0.6s ease; }
+.kitty.with-bidder .kitty-label { font-size: 0.56rem; margin-top: 3px; }
 .trick-card.sweep-out { animation: sweep-out 0.45s cubic-bezier(0.4, 0, 0.8, 0.4) both; }
 
 @keyframes slide-in {

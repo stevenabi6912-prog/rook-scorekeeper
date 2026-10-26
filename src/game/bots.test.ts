@@ -45,8 +45,14 @@ describe('bots', () => {
       { rules: FAMILY_RULES, handedness: 4, teams: TEAMS4, dealerSeat: 3 },
       { hands: [['G6', 'R7', 'Y8', 'B9', 'G7', 'R8', 'Y9', 'B6', 'R9'], ['R5'], ['R6'], ['R7']], nest: ['Y10', 'B6', 'B7', 'B8', 'B9'] },
     )
-    expect(botMaxBid(strong, 0)).toBeGreaterThanOrEqual(95)
+    expect(botMaxBid(strong, 0)).toBeGreaterThanOrEqual(85)
     expect(botMaxBid(weak, 0)).toBeLessThan(65)
+    // A middling hand (four trumps, nothing on top) must not reach 90.
+    const middling = startHandFromDeal(
+      { rules: FAMILY_RULES, handedness: 4, teams: TEAMS4, dealerSeat: 3 },
+      { hands: [['G9', 'G8', 'G7', 'G6', 'R10', 'Y12', 'B9', 'B5', 'Y6'], ['R5'], ['R6'], ['R7']], nest: ['Y10', 'B6', 'B7', 'B8', 'B9'] },
+    )
+    expect(botMaxBid(middling, 0)).toBeLessThan(75)
     expect(botDecision(weak, 0, seededRng('x'))).toEqual({ type: 'bid', seat: 0, bid: 'pass' })
   })
 

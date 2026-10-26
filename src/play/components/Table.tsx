@@ -23,6 +23,8 @@ interface TableProps {
   /** Speech bubble per seat (last bid, "thinking…", etc.). */
   bubbles: Record<number, ReactNode>
   sweep: Sweep | null
+  /** Cards being thrown in, fanned out on the table for a moment. */
+  reveal: { seat: number; cards: CardId[] } | null
 }
 
 /** Where seat `k` (relative to me, clockwise) sits, as a fraction of the table. */
@@ -31,6 +33,14 @@ export function seatPosition(k: number, n: number): { x: number; y: number } {
   const rx = n > 4 ? 0.36 : 0.37
   const ry = n > 4 ? 0.36 : 0.4
   return { x: 0.5 + rx * Math.cos(angle), y: 0.5 + ry * Math.sin(angle) }
+}
+
+/** Where the Kitty sits once it belongs to the bidder: tucked in beside their seat. */
+function kittyStyle(k: number, n: number): React.CSSProperties {
+  if (k === 0) return { left: '14%', top: '86%' }
+  const pos = seatPosition(k, n)
+  const toward = { x: 0.5 - pos.x, y: 0.5 - pos.y }
+  return { left: `${(pos.x + toward.x * 0.42) * 100}%`, top: `${(pos.y + toward.y * 0.12) * 100}%` }
 }
 
 function trickPosition(k: number, n: number): { x: number; y: number } {
@@ -53,16 +63,21 @@ function useSize() {
   return { ref, size }
 }
 
-export function Table({ state, me, seats, bubbles, sweep }: TableProps) {
+export function Table({ state, me, seats, bubbles, sweep, reveal }: TableProps) {
   const n = state.handedness
   const rel = (seat: number) => (seat - me + n) % n
   const { ref, size } = useSize()
   const cardW = Math.max(54, Math.min(84, Math.floor(size.w / 5)))
   const exposed = exposedNestCard(state)
 
-  const plays: { seat: number; card: CardId; key: string }[] = sweep
-    ? sweep.trick.plays.map((p) => ({ ...p, key: `sweep-${p.card}` }))
-    : state.trick.plays.map((p) => ({ ...p, key: `trick-${p.card}` }))
+  // Same keys whether the trick is live or being swept, so the cards already
+  // on the table stay put and only the newest one animates in.
+  const plays: { seat: number; card: CardId; key: string }[] = (sweep ? sweep.trick.plays : state.trick.plays).map((p) => ({ ...p, key: `card-${p.card}` }))
+  const lastPlayed = plays.length ? plays[plays.length - 1].card : null
+
+  // The Kitty: centre of the table while bidding; beside whoever won the bid after that.
+  const kittyWithBidder = state.bidderSeat !== null && state.phase !== 'bidding' && state.phase !== 'overshoot'
+  const showKitty = state.nest.length > 0 && !state.tricks.some((t) => t.tookNest) && (kittyWithBidder || plays.length === 0)
 
   return (
     <div className="table-area" ref={ref} style={state.trump ? { ['--trump' as string]: CARD_INK[state.trump] } : undefined}>
@@ -86,13 +101,39 @@ export function Table({ state, me, seats, bubbles, sweep }: TableProps) {
         )
       })}
 
-      {/* Kitty in the middle until the last trick takes it */}
-      {state.nest.length > 0 && !state.tricks.some((t) => t.tookNest) && plays.length === 0 && (
-        <div className="kitty" aria-label={`Kitty, ${state.nest.length} cards${exposed ? `, ${cardLabel(exposed)} showing` : ''}`}>
-          <CardStack count={state.nest.length} width={Math.round(cardW * (exposed ? 0.6 : 0.38))} topCard={exposed} />
+      {showKitty && (
+        <div
+          className={`kitty${kittyWithBidder ? ' with-bidder' : ''}`}
+          style={kittyWithBidder ? kittyStyle(rel(state.bidderSeat!), n) : undefined}
+          aria-label={`Kitty, ${state.nest.length} cards${exposed ? `, ${cardLabel(exposed)} showing` : ''}`}
+        >
+          <CardStack count={state.nest.length} width={Math.round(cardW * (kittyWithBidder ? 0.3 : exposed ? 0.6 : 0.38))} topCard={kittyWithBidder ? null : exposed} />
           <span className="kitty-label">Kitty</span>
         </div>
       )}
+
+      {reveal && reveal.cards.map((card, i) => {
+        const k = rel(reveal.seat)
+        const to = trickPosition(k, n)
+        const from = seatPosition(k, n)
+        const spread = (i - (reveal.cards.length - 1) / 2) * Math.min(cardW * 0.55, size.w / (reveal.cards.length + 1))
+        return (
+          <div
+            key={`reveal-${card}`}
+            className="trick-card slide-in reveal"
+            style={{
+              left: `calc(${to.x * 100}% + ${spread}px)`,
+              top: `${to.y * 100}%`,
+              ['--dx' as string]: `${(from.x - to.x) * size.w - spread}px`,
+              ['--dy' as string]: `${(from.y - to.y) * size.h}px`,
+              animationDelay: `${i * 0.12}s`,
+              zIndex: 30 + i,
+            }}
+          >
+            <Card id={card} width={Math.round(cardW * 0.8)} />
+          </div>
+        )
+      })}
 
       {plays.map((p) => {
         const k = rel(p.seat)
@@ -114,7 +155,9 @@ export function Table({ state, me, seats, bubbles, sweep }: TableProps) {
           const wdx = (wpos.x - to.x) * size.w
           const wdy = (wpos.y - to.y) * size.h
           const winning = p.seat === sweep.trick.winnerSeat
-          cls = `trick-card ${sweep.stage === 'move' ? 'sweep-out' : winning ? 'winning' : 'resting'}`
+          // While the completed trick rests, the card that finished it still slides in.
+          const base = sweep.stage === 'move' ? 'sweep-out' : p.card === lastPlayed ? 'slide-in' : 'resting'
+          cls = `trick-card ${base}${sweep.stage === 'rest' && winning ? ' winning' : ''}`
           style = { ...style, ['--wx' as string]: `${wdx}px`, ['--wy' as string]: `${wdy}px` }
         }
         return (

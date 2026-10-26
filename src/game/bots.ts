@@ -125,39 +125,60 @@ export function botTrump(state: HandState, seat: number): Suit {
 }
 
 /**
- * Rough points this hand expects to take with its best trump: the highest
- * bid the bot is comfortable with, as a multiple of 5.
+ * How many tricks this hand should win with its best trump, counted the way
+ * a careful player would: trumps that are top of the pile (the Rook, then 14,
+ * 13, 12 in an unbroken run from the top), length tricks once trumps are
+ * drawn, and off-color 14s (and a 13 behind a 14).
  */
-export function botMaxBid(state: HandState, seat: number): number {
+export function botTricks(state: HandState, seat: number, trumpSuit: Suit = botTrump(state, seat)): number {
   const { rules } = state
   const hand = state.hands[seat]
-  const trumpSuit = botTrump(state, seat)
   const groups = bySuit(hand)
-  const trumps = [...groups[trumpSuit], ...(hand.includes(ROOK) ? [ROOK] : [])]
-  let score = 0
-  score += trumps.length * 7
-  if (hand.includes(ROOK)) score += 12
-  score += groups[trumpSuit].filter((c) => str(c, rules) >= 13).length * 4
+  const trumps = groups[trumpSuit]
+  const hasRook = hand.includes(ROOK)
+  // Top trumps: Rook, then 14, 13, 12... as long as the run from the top is unbroken.
+  let top = hasRook ? 1 : 0
+  let unbroken = hasRook
+  for (const rank of [14, 13, 12, 11]) {
+    const held = trumps.some((c) => str(c, rules) === rank)
+    if (held && (unbroken || rank === 14)) {
+      top++
+      unbroken = true
+    } else if (!held) unbroken = false
+  }
+  const trumpCount = trumps.length + (hasRook ? 1 : 0)
+  // After three rounds of trumps the rest of a long trump suit wins on its own.
+  const length = Math.max(0, trumpCount - 3 - Math.max(0, 3 - top) * 0.5)
+  let off = 0
   for (const s of SUITS) {
     if (s === trumpSuit) continue
     const cards = groups[s]
-    if (cards.some((c) => str(c, rules) === 14)) score += 6
-    if (cards.some((c) => str(c, rules) === 13)) score += 3
-    if (cards.length === 0) score += 4 // a void ruffs
-    else if (cards.length === 1) score += 2
+    const has14 = cards.some((c) => str(c, rules) === 14)
+    if (has14) off += 1
+    if (has14 && cards.some((c) => str(c, rules) === 13)) off += 0.5
   }
-  score += hand.reduce((n, c) => n + pts(c, rules), 0) * 0.5
-  // The face-up Kitty card is coming to the bidder.
+  return Math.min(state.handSize, top + length + off)
+}
+
+/**
+ * The highest bid the bot is comfortable with, as a multiple of 5: about 12
+ * points a trick, plus what the Kitty and a bidding partner are worth.
+ */
+export function botMaxBid(state: HandState, seat: number): number {
+  const { rules } = state
+  const tricks = botTricks(state, seat)
+  let est = 10 + tricks * 12
+  // Picking up five Kitty cards is usually worth a trick, more if the face-up card helps.
+  est += 10
   const top = state.nest[0]
-  if (top && !isUnknown(top)) {
-    if (suitOf(top) === trumpSuit || top === ROOK) score += 4
-    else if (pts(top, rules) > 0) score += 2
-  }
-  // Partner already bidding means the hands fit together.
+  const trumpSuit = botTrump(state, seat)
+  if (top && !isUnknown(top) && (suitOf(top) === trumpSuit || top === ROOK)) est += 5
   const partnerBid = state.bidding.calls.some((c) => c.seat !== seat && state.teams[c.seat] === state.teams[seat] && c.bid !== 'pass')
-  if (partnerBid) score += 5
-  let max = Math.floor((35 + score) / 5) * 5
-  if (trumps.length < 6 && max > 100) max = 100
+  if (partnerBid) est += 5
+  const trumpCount = bySuit(state.hands[seat])[trumpSuit].length + (state.hands[seat].includes(ROOK) ? 1 : 0)
+  let max = Math.floor(est / 5) * 5
+  if (trumpCount < 6) max = Math.min(max, 90)
+  if (trumpCount < 7) max = Math.min(max, 100)
   return Math.max(0, Math.min(rules.maxBid, max))
 }
 
@@ -165,14 +186,12 @@ export function botBid(state: HandState, seat: number, rng: Rng): BidAction {
   const options = legalBids(state, seat)
   if (options.length === 0) throw new Error('bot has no legal bid')
   const numbers = options.filter((o): o is number => typeof o === 'number')
-  const { rules } = state
   const hand = state.hands[seat]
   const trumpSuit = botTrump(state, seat)
   const groups = bySuit(hand)
   const trumps = [...groups[trumpSuit], ...(hand.includes(ROOK) ? [ROOK] : [])]
-  const losers = hand.filter((c) => c !== ROOK && suitOf(c) !== trumpSuit && str(c, rules) < 13).length
   // A hand that can run the table shoots for the Moon.
-  if (options.includes('moon') && hand.includes(ROOK) && trumps.length >= 7 && groups[trumpSuit].some((c) => str(c, rules) === 14) && losers <= 1) {
+  if (options.includes('moon') && hand.includes(ROOK) && trumps.length >= 8 && botTricks(state, seat) >= state.handSize - 0.5) {
     return 'moon'
   }
   const max = botMaxBid(state, seat)
