@@ -116,6 +116,9 @@
   flex-direction: column; gap: 2px; padding: 4px 8px; border-radius: 14px; max-width: 84px;
 }
 .seat-spot .seat-name { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+/* The far seat's bubble goes beside it, not below, where it would cover the Kitty's face-up card. */
+.seat-spot.n6.k3 .bubble, .seat-spot.n4.k2 .bubble { top: 50%; left: 100%; margin: 0 0 0 8px; transform: translateY(-50%); }
+.seat-spot.n6.k3 .bubble::before, .seat-spot.n4.k2 .bubble::before { left: -5px; top: 50%; transform: translateY(-50%) rotate(45deg); }
 /* Six seats: the side seats are close together, so the stack sits beside the badge. */
 .seat-spot.n6.k1, .seat-spot.n6.k2 { flex-direction: row; }
 .seat-spot.n6.k4, .seat-spot.n6.k5 { flex-direction: row-reverse; }
