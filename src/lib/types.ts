@@ -61,6 +61,7 @@ export interface Hand {
   pointsTaken: number
   /** Only present when bid === 'moon'. */
   moonMade?: boolean
+  /** Player id, or ROOK_IN_KITTY when the Rook was dealt to the Kitty. */
   rookHolderId?: string | null
   /** Trump suit named by the bidder. */
   trump?: Trump | null
@@ -80,3 +81,6 @@ export const RULES = {
 } as const
 
 export const otherTeam = (t: TeamId): TeamId => (t === 'A' ? 'B' : 'A')
+
+/** Recorded as the Rook holder when the Rook was in the Kitty rather than dealt to a player. */
+export const ROOK_IN_KITTY = 'kitty'

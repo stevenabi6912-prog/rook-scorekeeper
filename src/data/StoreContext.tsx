@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { isFirebaseConfigured } from '../firebase/config'
 import { loadDemoMode, loadFamilyCode, saveDemoMode, saveFamilyCode } from './family'
+import { createLocalMatchStore } from '../play/match/localMatchStore'
+import type { MatchStore } from '../play/match/store'
 import { createLocalStore } from './localStore'
 import type { DataStore } from './store'
 
@@ -13,6 +15,8 @@ interface StoreContextValue {
   state: ConnectionState
   error: string | null
   store: DataStore | null
+  /** Online tables; same backend as `store`. */
+  matchStore: MatchStore | null
   /** Join a family (passcode already normalized). */
   join: (code: string, opts?: { demo?: boolean }) => void
   leave: () => void
@@ -27,10 +31,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ConnectionState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [store, setStore] = useState<DataStore | null>(null)
+  const [matchStore, setMatchStore] = useState<MatchStore | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setStore(null)
+    setMatchStore(null)
     setError(null)
     if (!familyCode) {
       setState('idle')
@@ -38,17 +44,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     if (demoMode || !configured) {
       setStore(createLocalStore(familyCode))
+      setMatchStore(createLocalMatchStore(familyCode))
       setState('ready')
       return
     }
     setState('connecting')
     // Firebase is loaded on demand so the demo build stays small and a phone
     // only downloads the SDK once the family has a real backend.
-    Promise.all([import('../firebase/app'), import('./firestoreStore')])
-      .then(async ([fb, fs]) => {
-        await fb.ensureAnonymousUser()
+    Promise.all([import('../firebase/app'), import('./firestoreStore'), import('../play/match/firestoreMatchStore')])
+      .then(async ([fb, fs, ms]) => {
+        const user = await fb.ensureAnonymousUser()
         if (cancelled) return
         setStore(fs.createFirestoreStore(fb.getFirebase().db, familyCode))
+        setMatchStore(ms.createFirestoreMatchStore(fb.getFirebase().db, user.uid, familyCode))
         setState('ready')
       })
       .catch((e: unknown) => {
@@ -77,8 +85,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [configured])
 
   const value = useMemo<StoreContextValue>(
-    () => ({ familyCode, demoMode: demoMode || !configured, firebaseConfigured: configured, state, error, store, join, leave }),
-    [familyCode, demoMode, configured, state, error, store, join, leave],
+    () => ({ familyCode, demoMode: demoMode || !configured, firebaseConfigured: configured, state, error, store, matchStore, join, leave }),
+    [familyCode, demoMode, configured, state, error, store, matchStore, join, leave],
   )
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
@@ -94,6 +102,13 @@ export function useStore(): DataStore {
   const { store } = useStoreContext()
   if (!store) throw new Error('Store not ready')
   return store
+}
+
+/** The online-table store. Only call from screens rendered behind the passcode gate. */
+export function useMatchStore(): MatchStore {
+  const { matchStore } = useStoreContext()
+  if (!matchStore) throw new Error('Match store not ready')
+  return matchStore
 }
 
 function describeFirebaseError(e: unknown): string {

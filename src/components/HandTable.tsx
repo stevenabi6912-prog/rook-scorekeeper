@@ -1,5 +1,5 @@
 import { describeBid, type ScoredHand } from '../lib/scoring'
-import { otherTeam, trumpInfo, type Game, type Player, type TeamId } from '../lib/types'
+import { ROOK_IN_KITTY, otherTeam, trumpInfo, type Game, type Player, type TeamId } from '../lib/types'
 import { TrumpDot } from './TrumpPicker'
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
 
 export function HandTable({ game, scored, byId, onSelect }: Props) {
   if (scored.length === 0) return <div className="empty">No hands yet. Tap “Add hand” after the first hand is played.</div>
-  const name = (id: string | null | undefined) => (id ? byId.get(id)?.name ?? '?' : '—')
+  const name = (id: string | null | undefined) => (id === ROOK_IN_KITTY ? 'Kitty' : id ? byId.get(id)?.name ?? '?' : '—')
   return (
     <table className="hand-table">
       <thead>

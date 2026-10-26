@@ -8,7 +8,7 @@ import { useStore } from '../data/StoreContext'
 import { useGame, useHands, usePlayers } from '../hooks/useData'
 import { BID_OPTIONS, currentTotals, isValidBid, isValidPoints, replayHands, scoreHand, type Scores } from '../lib/scoring'
 import { nextDealerId, teamOf } from '../lib/seating'
-import { otherTeam, RULES, type Bid, type Game, type Hand, type HandInput, type Player, type TeamId, type Trump } from '../lib/types'
+import { ROOK_IN_KITTY, otherTeam, RULES, type Bid, type Game, type Hand, type HandInput, type Player, type TeamId, type Trump } from '../lib/types'
 
 export function HandFormPage() {
   const { gameId, handId } = useParams()
@@ -227,6 +227,14 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
           <h3>Who held the Rook? (optional)</h3>
           <div className="chips grid-2">
             {game.seatOrder.map((id) => playerChip(id, rookHolderId === id, () => setRookHolderId(rookHolderId === id ? null : id)))}
+            <button
+              type="button"
+              className={`chip${rookHolderId === ROOK_IN_KITTY ? ' selected' : ''}`}
+              onClick={() => setRookHolderId(rookHolderId === ROOK_IN_KITTY ? null : ROOK_IN_KITTY)}
+              aria-pressed={rookHolderId === ROOK_IN_KITTY}
+            >
+              🃏 Kitty
+            </button>
           </div>
         </section>
 
