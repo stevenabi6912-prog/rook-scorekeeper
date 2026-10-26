@@ -653,7 +653,7 @@ cancel like a messaging app.
 
 ---
 
-## 3.11 What was actually built (2026-10-25, branch `online-play`)
+## 3.11 What was actually built (2026-10-25/26; merged to `main` and live on 2026-10-26)
 
 The data layer and online table exist and are verified end to end **in demo
 mode** (the in-browser store), on one phone holding one seat with three bots:
@@ -678,7 +678,14 @@ while building:
 - `?auto` on a table URL lets this phone's seat be played by the bot logic
   (watching, testing).
 
-**Not yet verified:** the Firestore implementation against the real project.
+**Verified on 2026-10-26** against the real project under the test passcode
+`online-test`: a full six-hand game with Steven on his phone and bots on the
+host's browser, finishing itself at 500. Rules published by Steven (the
+helper function had to be renamed because `match` is a reserved word). One
+later rules change (seat cards readable once a hand is over, for the
+throw-in reveal) still needs republishing.
+
+Earlier note, kept for history: the Firestore implementation against the real project.
 The draft rules are in `firestore.rules` on the branch and have **not been
 published**; until they are, the live app cannot create or read matches
 (the scorekeeper is unaffected either way). Publishing is a copy-paste in the

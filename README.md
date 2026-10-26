@@ -240,15 +240,15 @@ firestore.rules           Firestore security rules
 
 ---
 
-## Online play (branch `online-play`, not yet on the live site)
+## Online play
 
-The `online-play` branch adds a **Play** tab: a practice table against bots,
+The **Play** tab (live since 2026-10-26) has a practice table against bots,
 and online tables where each family member plays from their own phone with
 bots filling any empty seats. Finished hands are written to the game like any
 hand entered by hand, so history and stats work unchanged.
 
 The design, the family's exact rules, and the status of the work are in
-[docs/online-play-plan.md](docs/online-play-plan.md). Before online tables can
-work against the real Firebase project, the `firestore.rules` on that branch
-(which add `matches`, per-seat `seats` and `nest` documents under each family)
-must be published in the console, exactly as in step 5 above.
+[docs/online-play-plan.md](docs/online-play-plan.md). Online tables need the
+`firestore.rules` in this repo (which add `matches`, per-seat `seats` and
+`nest` documents under each family) to be published in the console, exactly
+as in step 5 above; republish whenever that file changes.
