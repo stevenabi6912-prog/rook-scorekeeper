@@ -67,6 +67,15 @@
 .top-chip.muted-chip { color: var(--felt-muted); font-weight: 600; }
 .top-chip.trump-pill { color: #fff; font-weight: 700; letter-spacing: 0.04em; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); animation: pop 0.3s ease-out; }
 .top-chip.trump-pill .trump-dot { box-shadow: 0 0 0 2px #fff; }
+/* Phone width: four icon buttons plus two chips must leave room for the scores. */
+@media (max-width: 440px) {
+  .table-top { gap: 4px; padding-left: 4px; padding-right: 4px; }
+  .table-top .icon-btn { min-width: 32px; padding-left: 4px; padding-right: 4px; }
+  .table-title .scores { font-size: 0.95rem; }
+  .scores .score-sep { margin: 0 4px; }
+  .top-chip { padding: 3px 7px; font-size: 0.68rem; gap: 4px; }
+  .top-chip .trump-word { display: none; }
+}
 
 /* Table */
 .table-area { position: relative; flex: 1; min-height: 0; }

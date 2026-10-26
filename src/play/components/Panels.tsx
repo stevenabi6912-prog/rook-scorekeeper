@@ -139,7 +139,7 @@ export function TrumpChip({ trump }: { trump: Suit | null }) {
   if (!trump) return null
   return (
     <span className="top-chip trump-pill" style={{ background: CARD_INK[trump] }}>
-      <TrumpDot trump={trump} /> {trump.toUpperCase()} TRUMP
+      <TrumpDot trump={trump} /> {trump.toUpperCase()}<span className="trump-word"> TRUMP</span>
     </span>
   )
 }
