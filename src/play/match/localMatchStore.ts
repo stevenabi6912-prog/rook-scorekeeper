@@ -1,11 +1,12 @@
 import type { CardId } from '../../game/cards'
 import type { MatchStore, MatchTx } from './store'
-import type { MatchDoc, NewMatch } from './types'
+import type { ChatMessage, MatchDoc, NewMatch } from './types'
 
 interface LocalMatchData {
   matches: Record<string, MatchDoc>
   seats: Record<string, CardId[][]>
   nests: Record<string, CardId[]>
+  messages?: Record<string, ChatMessage[]>
 }
 
 const DEVICE_KEY = 'rook.deviceId'
@@ -41,7 +42,7 @@ export function createLocalMatchStore(familyCode: string): MatchStore {
     } catch {
       /* ignore */
     }
-    return { matches: {}, seats: {}, nests: {} }
+    return { matches: {}, seats: {}, nests: {}, messages: {} }
   }
   function save() {
     localStorage.setItem(KEY, JSON.stringify(data))
@@ -71,6 +72,15 @@ export function createLocalMatchStore(familyCode: string): MatchStore {
     async getSeat(matchId, seat) {
       return data.seats[matchId]?.[seat] ?? []
     },
+    subscribeMessages(matchId, cb) {
+      return listen(() => cb([...(data.messages?.[matchId] ?? [])].sort((a, b) => a.createdAt - b.createdAt).slice(-100)))
+    },
+    async sendMessage(matchId, m) {
+      const msg: ChatMessage = { ...m, id: id(), createdAt: Date.now() }
+      const list = [...(data.messages?.[matchId] ?? []), msg].slice(-200)
+      data = { ...data, messages: { ...(data.messages ?? {}), [matchId]: list } }
+      save()
+    },
     async createMatch(m: NewMatch) {
       const match: MatchDoc = { ...m, id: id(), createdAt: Date.now(), updatedAt: Date.now() }
       data = { ...data, matches: { ...data.matches, [match.id]: match } }
@@ -81,10 +91,12 @@ export function createLocalMatchStore(familyCode: string): MatchStore {
       const matches = { ...data.matches }
       const seats = { ...data.seats }
       const nests = { ...data.nests }
+      const messages = { ...(data.messages ?? {}) }
       delete matches[matchId]
       delete seats[matchId]
       delete nests[matchId]
-      data = { matches, seats, nests }
+      delete messages[matchId]
+      data = { matches, seats, nests, messages }
       save()
     },
     transact<T>(matchId: string, fn: (tx: MatchTx) => Promise<T>): Promise<T> {
@@ -119,6 +131,7 @@ export function createLocalMatchStore(familyCode: string): MatchStore {
         const seats = [...(data.seats[matchId] ?? Array.from({ length: match.handedness }, () => []))]
         for (const [seat, cards] of seatWrites) seats[seat] = cards
         data = {
+          ...data,
           matches: { ...data.matches, [matchId]: { ...match, ...(matchPatch ?? {}), updatedAt: Date.now() } },
           seats: { ...data.seats, [matchId]: seats },
           nests: nestWrite ? { ...data.nests, [matchId]: nestWrite } : data.nests,

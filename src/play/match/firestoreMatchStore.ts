@@ -16,7 +16,7 @@ import {
 import type { CardId } from '../../game/cards'
 import { clean } from '../../data/store'
 import type { MatchStore, MatchTx } from './store'
-import type { MatchDoc, NewMatch } from './types'
+import type { ChatMessage, MatchDoc, NewMatch } from './types'
 
 const asDoc = <T>(snap: QueryDocumentSnapshot<DocumentData>): T => ({ id: snap.id, ...snap.data() }) as T
 
@@ -33,6 +33,7 @@ export function createFirestoreMatchStore(db: Firestore, uid: string, familyCode
   const matchDoc = (id: string) => doc(matches, id)
   const seatDoc = (id: string, seat: number) => doc(matches, id, 'seats', String(seat))
   const nestDoc = (id: string) => doc(matches, id, 'nest', 'current')
+  const messagesCol = (id: string) => collection(matches, id, 'messages')
 
   return {
     kind: 'firestore',
@@ -59,6 +60,17 @@ export function createFirestoreMatchStore(db: Firestore, uid: string, familyCode
       const snap = await getDoc(seatDoc(matchId, seat))
       return snap.exists() ? ((snap.data().cards as CardId[]) ?? []) : []
     },
+    subscribeMessages(matchId, cb, onError) {
+      // Newest 100 by the index order, handed back oldest first.
+      return onSnapshot(
+        query(messagesCol(matchId), orderBy('createdAt', 'desc'), limit(100)),
+        (snap) => cb(snap.docs.map((d) => asDoc<ChatMessage>(d)).reverse()),
+        onError,
+      )
+    },
+    async sendMessage(matchId, m) {
+      await addDoc(messagesCol(matchId), clean({ ...m, createdAt: Date.now() }))
+    },
     async createMatch(m: NewMatch) {
       const ref = await addDoc(matches, clean({ ...m, createdAt: Date.now(), updatedAt: Date.now() }))
       return ref.id
@@ -69,6 +81,7 @@ export function createFirestoreMatchStore(db: Firestore, uid: string, familyCode
       batch.delete(nestDoc(id))
       batch.delete(matchDoc(id))
       await batch.commit()
+      // Chat lines are left behind; they are unreachable without the match and cost nothing.
     },
     transact<T>(matchId: string, fn: (tx: MatchTx) => Promise<T>): Promise<T> {
       return runTransaction(db, async (t) => {

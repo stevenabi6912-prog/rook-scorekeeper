@@ -115,6 +115,21 @@ service cloud.firestore {
             || (isSeated() && turnIsStale() && table().pub.turnSeat == int(seat)));
         }
 
+        match /messages/{msgId} {
+          // Table chat: anyone seated (or the host, for bot and event lines) may post as
+          // themselves; text is capped, voice notes are small base64 clips.
+          allow read: if signedIn() && validCode(code);
+          allow create: if signedIn() && validCode(code) && (isSeated() || isHost())
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.kind in ['text', 'reaction', 'voice', 'event']
+            && request.resource.data.text is string
+            && request.resource.data.text.size() <= 500
+            && (!('audio' in request.resource.data) || (request.resource.data.audio is string && request.resource.data.audio.size() <= 300000))
+            && request.resource.data.createdAt is number;
+          allow update: if false;
+          allow delete: if isHost();
+        }
+
         match /nest/{nestId} {
           function bidderUid() {
             return table().seats[table().pub.bidderSeat].uid;

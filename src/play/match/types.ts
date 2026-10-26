@@ -58,3 +58,25 @@ export interface MatchDoc {
 export type NewMatch = Omit<MatchDoc, 'id' | 'createdAt' | 'updatedAt'>
 
 export const SEAT_CARDS_DOC = 'cards'
+
+/** Table chat: what people say, quick reactions, voice notes, and the hand's events. */
+export type ChatKind = 'text' | 'reaction' | 'voice' | 'event'
+
+export interface ChatMessage {
+  id: string
+  /** Sender's uid (the host's for bot and event lines). */
+  uid: string
+  /** Seat the line belongs to, or null for a table-wide event. */
+  seat: number | null
+  kind: ChatKind
+  text: string
+  /** Voice note: base64 audio and its MIME type. */
+  audio?: string
+  mimeType?: string
+  durationMs?: number
+  createdAt: number
+}
+
+export type NewChatMessage = Omit<ChatMessage, 'id' | 'createdAt'>
+
+export const QUICK_REACTIONS = ['👍', '😂', '😮', '😤', '🙏', '🐦']
