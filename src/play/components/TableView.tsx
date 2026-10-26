@@ -93,7 +93,8 @@ export function TableView(props: TableViewProps) {
     const t = setTimeout(() => setRevealing(false), REVEAL_MS)
     return () => clearTimeout(t)
   }, [revealKey])
-  const reveal = revealing && state.claimedBySeat !== null ? { seat: state.claimedBySeat, cards: state.claimedCards } : null
+  // Hands recorded before claimedCards existed have none to show.
+  const reveal = revealing && state.claimedBySeat !== null ? { seat: state.claimedBySeat, cards: state.claimedCards ?? [] } : null
 
   const busy = sweep !== null || revealing
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange])

@@ -28,5 +28,5 @@ export function toState(pub: PublicHand, me: number, myCards: CardId[], nest?: C
   const mine = pub.phase === 'over' && cardCounts[me] === 0 ? [] : [...myCards]
   const hands = cardCounts.map((n, i) => (i === me ? mine : Array.from({ length: n }, () => UNKNOWN)))
   const nestCards = nest ?? Array.from({ length: nestCount }, (_, i) => (i === 0 && kittyTop ? kittyTop : UNKNOWN))
-  return { ...rest, rules: FAMILY_RULES, hands, nest: nestCards }
+  return { ...rest, claimedCards: rest.claimedCards ?? [], rules: FAMILY_RULES, hands, nest: nestCards }
 }
