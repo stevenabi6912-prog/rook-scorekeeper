@@ -35,7 +35,7 @@ export function PlayLobbyPage() {
   const [choosing, setChoosing] = useState(false)
   const [starting, setStarting] = useState(false)
 
-  useEffect(() => matchStore.subscribeMatches(setMatches, (e) => setError(describeStoreError(e))), [matchStore])
+  useEffect(() => matchStore.subscribeMatches(setMatches, (e) => setError(`Could not load the tables. ${describeStoreError(e)}`)), [matchStore])
   const me = identity ? byId.get(identity) : undefined
   const validIdentity = me && !me.archived && !me.bot ? identity : null
   useHeartbeat(validIdentity, null)
@@ -153,7 +153,7 @@ export function PlayLobbyPage() {
                   const { matchId } = await startTable(dataStore, matchStore, players ?? [], input)
                   navigate(`/play/${matchId}`)
                 } catch (e) {
-                  setError(describeStoreError(e as Error))
+                  setError(`Could not open the table. ${describeStoreError(e as Error)}`)
                   setStarting(false)
                 }
               }}

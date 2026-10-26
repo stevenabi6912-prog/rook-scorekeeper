@@ -46,7 +46,7 @@ export function TablePage() {
 
   useEffect(() => {
     setMatch(undefined)
-    return matchStore.subscribeMatch(matchId, setMatch, (e) => setError(describeStoreError(e)))
+    return matchStore.subscribeMatch(matchId, setMatch, (e) => setError(`Could not load the table. ${describeStoreError(e)}`))
   }, [matchStore, matchId])
 
   const seatsHeld = useMemo(() => (match ? mySeats(match, matchStore.uid) : []), [match, matchStore.uid])
@@ -135,10 +135,10 @@ export function TablePage() {
         byId={byId}
         isHost={isHost}
         uid={matchStore.uid}
-        onClaim={(seat) => claimSeat(matchStore, match.id, seat).catch((e) => setError(String(e.message ?? e)))}
-        onRelease={(seat) => releaseSeat(matchStore, match.id, seat).catch((e) => setError(String(e.message ?? e)))}
-        onBots={(seat) => seatBots(matchStore, match.id, seat).catch((e) => setError(String(e.message ?? e)))}
-        onStart={() => dealNextHand(matchStore, match.id).catch((e) => setError(String(e.message ?? e)))}
+        onClaim={(seat) => claimSeat(matchStore, match.id, seat).catch((e) => setError(`Could not take that seat. ${describeStoreError(e)}`))}
+        onRelease={(seat) => releaseSeat(matchStore, match.id, seat).catch((e) => setError(`Could not free that seat. ${describeStoreError(e)}`))}
+        onBots={(seat) => seatBots(matchStore, match.id, seat).catch((e) => setError(`Could not seat a bot. ${describeStoreError(e)}`))}
+        onStart={() => dealNextHand(matchStore, match.id).catch((e) => setError(`Could not deal. ${describeStoreError(e)}`))}
         onCancel={() => setMatchStatus(matchStore, match.id, 'abandoned').then(() => navigate('/play'))}
         onDelete={() => matchStore.deleteMatch(match.id).then(() => navigate('/play'))}
       />

@@ -2,14 +2,22 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../data/StoreContext'
 import type { Game, Hand, Player } from '../lib/types'
 
-/** Turns raw Firestore errors into something a family member can act on. */
+/**
+ * Turns raw Firestore errors into something a family member can act on, and
+ * keeps the Firebase error code so a screenshot of the message is enough to
+ * work out what went wrong.
+ */
 export function describeStoreError(e: Error): string {
+  const code = (e as { code?: string }).code ?? ''
   const msg = e.message ?? ''
-  if (/insufficient permissions|permission-denied/i.test(msg)) {
-    return 'Firestore refused the request. The security rules have probably not been published yet: in the Firebase console open Firestore Database → Rules, paste the contents of firestore.rules, and click Publish.'
+  if (code === 'permission-denied' || /insufficient permissions|permission-denied/i.test(msg)) {
+    return 'Firebase refused it (permission-denied). Close the app completely and open it again; if it keeps happening, send a screenshot of this message.'
   }
-  if (/unavailable|network/i.test(msg)) return 'Could not reach Firebase. Check your connection.'
-  return msg || 'Something went wrong talking to Firebase.'
+  if (code === 'unavailable' || /unavailable|network|offline/i.test(msg)) return 'Could not reach Firebase. Check your connection and try again.'
+  if (code === 'failed-precondition' || /indexeddb|indexed database/i.test(msg)) {
+    return `This browser's storage is not working for Firebase (${code || 'storage'}: ${msg}). Close the app completely and open it again.`
+  }
+  return `${code ? `${code}: ` : ''}${msg || 'Something went wrong talking to Firebase.'}`
 }
 
 export function usePlayers() {
