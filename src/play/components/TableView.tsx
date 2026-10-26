@@ -278,7 +278,7 @@ export function TableView(props: TableViewProps) {
     : `${state.bid === 'moon' ? 'Moon' : state.bid} · ${seats[state.bidderSeat!].name}`
 
   return (
-    <div className="table-page" onPointerDownCapture={unlockAudio}>
+    <div className="table-page" onPointerDownCapture={unlockAudio} onTouchStartCapture={unlockAudio}>
       <header className="table-top">
         <Link className="icon-btn light" to={backTo} aria-label="Leave table">‹</Link>
         <div className="table-title">
@@ -297,8 +297,11 @@ export function TableView(props: TableViewProps) {
           aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
           onClick={() => {
             unlockAudio()
-            setMuted(!muted)
-            setMutedState(!muted)
+            const next = !muted
+            setMuted(next)
+            setMutedState(next)
+            // A chime on unmute, so you can hear at once whether sound works on this phone.
+            if (!next) setTimeout(() => sounds.yourTurn(), 50)
           }}
         >
           {muted ? '🔇' : '🔊'}

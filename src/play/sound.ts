@@ -32,6 +32,13 @@ export function setMuted(m: boolean) {
   }
 }
 
+let primed = false
+
+/**
+ * Call from a user gesture (tap). Creates the audio context, resumes it, and
+ * on iOS plays one silent buffer inside the gesture, which is what Safari
+ * needs before it will let any later sound through. Safe to call often.
+ */
 export function unlockAudio() {
   if (typeof window === 'undefined') return
   unlocked = true
@@ -39,8 +46,28 @@ export function unlockAudio() {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return
     ctx = new Ctor()
+    // Coming back from another app or a locked screen suspends the context.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && ctx?.state === 'suspended') void ctx.resume()
+    })
   }
   if (ctx.state === 'suspended') void ctx.resume()
+  if (!primed) {
+    try {
+      const src = ctx.createBufferSource()
+      src.buffer = ctx.createBuffer(1, 1, 22050)
+      src.connect(ctx.destination)
+      src.start(0)
+      primed = true
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** True once a tap has unlocked audio and the context is running. */
+export function audioReady(): boolean {
+  return !!ctx && ctx.state === 'running'
 }
 
 function audio(): AudioContext | null {
