@@ -1,10 +1,10 @@
 import { TrumpDot, TrumpPicker } from '../../components/TrumpPicker'
-import type { BidAction, HandState } from '../../game/engine'
+import { exposedNestCard, type BidAction, type HandState } from '../../game/engine'
 import type { HandResult } from '../../game/score'
 import { type Suit } from '../../game/rules'
 import type { HandOutcome } from '../../lib/scoring'
 import type { TeamId } from '../../lib/types'
-import { CARD_INK } from './Card'
+import { CARD_INK, Card, cardLabel } from './Card'
 import type { SeatInfo } from './Table'
 
 export function BidPanel({
@@ -14,12 +14,20 @@ export function BidPanel({
   const high = state.bidding.highBid
   const highSeat = state.bidding.highSeat
   const stuck = !options.includes('pass')
+  const exposed = exposedNestCard(state)
   return (
     <div className="action-panel">
-      <div className="panel-title">
-        {high === null
-          ? stuck ? 'Everyone passed. You are stuck with 65.' : 'Your bid'
-          : <>Bid is <strong>{high === 'moon' ? 'Moon' : high}</strong> by {seats[highSeat!].name}</>}
+      <div className="panel-title bid-title">
+        <span className="grow">
+          {high === null
+            ? stuck ? 'Everyone passed. You are stuck with 65.' : 'Your bid'
+            : <>Bid is <strong>{high === 'moon' ? 'Moon' : high}</strong> by {seats[highSeat!].name}</>}
+        </span>
+        {exposed && (
+          <span className="bid-showing" aria-label={`Top of the Kitty: ${cardLabel(exposed)}`}>
+            <Card id={exposed} width={40} /> <span className="small">on the Kitty</span>
+          </span>
+        )}
       </div>
       <div className="bid-grid">
         {numbers.map((b) => (

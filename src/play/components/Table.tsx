@@ -103,7 +103,7 @@ export function Table({ state, me, seats, bubbles, sweep, reveal }: TableProps) 
 
       {showKitty && (
         <div
-          className={`kitty${kittyWithBidder ? ' with-bidder' : ''}`}
+          className={`kitty${kittyWithBidder ? ' with-bidder' : exposed ? ' exposed' : ''}`}
           style={kittyWithBidder ? kittyStyle(rel(state.bidderSeat!), n) : undefined}
           aria-label={`Kitty, ${state.nest.length} cards${exposed ? `, ${cardLabel(exposed)} showing` : ''}`}
         >

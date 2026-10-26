@@ -365,14 +365,13 @@ export function TableView(props: TableViewProps) {
       <header className="table-top">
         <Link className="icon-btn light" to={backTo} aria-label="Leave table">‹</Link>
         <div className="table-title">
-          <div className="hand-no">Hand {handNumber}</div>
+          <div className="hand-no">Hand {handNumber}{(state.bid !== null || state.bidding.highBid !== null) && <> · {bidLabel}</>}</div>
           <div className="scores">
             <span className="score team-A">{totals.A}</span>
             <span className="score-sep">·</span>
             <span className="score team-B">{totals.B}</span>
           </div>
         </div>
-        {(state.bid !== null || state.bidding.highBid !== null) && <span className="top-chip">{bidLabel}</span>}
         <TrumpChip trump={state.trump} />
         {onSeats && (
           <button type="button" className="icon-btn light" aria-label="Seats" onClick={onSeats}>👥</button>

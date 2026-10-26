@@ -54,7 +54,7 @@
 }
 .table-top .icon-btn.light { color: var(--felt-text); }
 .table-title { flex: 1; min-width: 0; line-height: 1.15; white-space: nowrap; }
-.table-title .hand-no { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--felt-muted); font-weight: 600; }
+.table-title .hand-no { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--felt-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .table-title .scores { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .scores .score-sep { margin: 0 6px; color: var(--felt-muted); }
 .score.team-A { color: #9ec5ff; }
@@ -146,6 +146,8 @@
 .seat-tag.bidder { background: #fff; color: #b8860b; }
 
 .kitty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; z-index: 1; opacity: 0.9; transition: left 0.6s ease, top 0.6s ease; }
+/* While the top card shows during bidding, the Kitty sits below the far seat's cards and above them in stacking order. */
+.kitty.exposed { top: 60%; z-index: 6; }
 .kitty-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--felt-muted); font-weight: 700; margin-top: 6px; }
 
 .trick-card { position: absolute; transform: translate(-50%, -50%); }
@@ -203,6 +205,8 @@
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3); animation: pop 0.2s ease-out;
 }
 .panel-title { font-weight: 500; font-size: 0.95rem; margin-bottom: 10px; color: #3b4652; }
+.panel-title.bid-title { display: flex; align-items: center; gap: 10px; }
+.bid-showing { display: inline-flex; align-items: center; gap: 6px; color: #3b4652; white-space: nowrap; }
 .bid-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
 .bid-btn {
   min-height: 44px; border-radius: 10px; border: 1px solid #d5dce4; background: #f7f9fb; font-weight: 700; font-size: 1rem; color: #15202b;
