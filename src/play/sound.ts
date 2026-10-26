@@ -24,6 +24,10 @@ export function isMuted(): boolean {
 
 export function setMuted(m: boolean) {
   muted = m
+  if (m && keepAlive) {
+    keepAlive.pause()
+    keepAlive = null
+  }
   try {
     if (m) localStorage.setItem(KEY, '1')
     else localStorage.removeItem(KEY)
@@ -33,6 +37,53 @@ export function setMuted(m: boolean) {
 }
 
 let primed = false
+let keepAlive: HTMLAudioElement | null = null
+
+/** A one-second silent WAV, built in memory (no file to download). */
+function silentWav(): string {
+  const rate = 8000
+  const samples = rate
+  const buf = new ArrayBuffer(44 + samples * 2)
+  const v = new DataView(buf)
+  const str = (o: number, t: string) => [...t].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)))
+  str(0, 'RIFF')
+  v.setUint32(4, 36 + samples * 2, true)
+  str(8, 'WAVE')
+  str(12, 'fmt ')
+  v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true)
+  v.setUint16(22, 1, true)
+  v.setUint32(24, rate, true)
+  v.setUint32(28, rate * 2, true)
+  v.setUint16(32, 2, true)
+  v.setUint16(34, 16, true)
+  str(36, 'data')
+  v.setUint32(40, samples * 2, true)
+  let bin = ''
+  const bytes = new Uint8Array(buf)
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  return 'data:audio/wav;base64,' + btoa(bin)
+}
+
+/**
+ * iPhones mute web audio while the ring/silent switch is on, unless the page
+ * is playing a media element; then it counts as a music player. A looping
+ * silent clip, started from a tap, keeps that door open.
+ */
+function startKeepAlive() {
+  if (keepAlive) return
+  try {
+    const a = new Audio(silentWav())
+    a.loop = true
+    a.setAttribute('playsinline', 'true')
+    a.volume = 0.01
+    const p = a.play()
+    if (p && typeof p.catch === 'function') p.catch(() => undefined)
+    keepAlive = a
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
  * Call from a user gesture (tap). Creates the audio context, resumes it, and
@@ -52,6 +103,7 @@ export function unlockAudio() {
     })
   }
   if (ctx.state !== 'running') void ctx.resume()
+  if (!muted) startKeepAlive()
   if (!primed) {
     try {
       const src = ctx.createBufferSource()
