@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Dialog } from '../components/Dialog'
 import { HandTable } from '../components/HandTable'
 import { TopBar } from '../components/Layout'
 import { DealerCard, ScoreBoard } from '../components/ScoreBoard'
 import { TrumpDot, TrumpPicker } from '../components/TrumpPicker'
-import { useStore } from '../data/StoreContext'
+import { useMatchStore, useStore } from '../data/StoreContext'
+import type { MatchDoc } from '../play/match/types'
 import { useGame, useHands, usePlayers } from '../hooks/useData'
 import { leadingTeam, replayHands, teamsAtTarget } from '../lib/scoring'
 import { nextDealerId } from '../lib/seating'
@@ -18,6 +19,7 @@ export function GamePage() {
   const { game, loading: gameLoading, error: gameError } = useGame(gameId)
   const { hands, loading: handsLoading } = useHands(gameId)
   const { byId } = usePlayers()
+  const liveTable = useLiveTable(gameId)
 
   const scored = useMemo(() => replayHands(hands ?? []), [hands])
   const totals = scored.length ? scored[scored.length - 1].outcome.totals : { A: 0, B: 0 }
@@ -60,6 +62,12 @@ export function GamePage() {
         right={<button className="icon-btn" onClick={() => setMenuOpen(true)} aria-label="More">⋯</button>}
       />
       <main className="page no-nav">
+        {isActive && liveTable && (
+          <div className="banner">
+            <strong>This game is being played online.</strong>
+            <Link className="btn primary block" to={`/play/${liveTable.id}`}>Go to the table</Link>
+          </div>
+        )}
         {!isActive && (
           <div className="banner">
             <strong>Game over.</strong>{' '}
@@ -202,4 +210,18 @@ export function GamePage() {
       </Dialog>
     </>
   )
+}
+
+/** The open online table for this game, if there is one. */
+function useLiveTable(gameId: string | undefined): MatchDoc | null {
+  const matchStore = useMatchStore()
+  const [table, setTable] = useState<MatchDoc | null>(null)
+  useEffect(() => {
+    if (!gameId) return
+    return matchStore.subscribeMatches(
+      (list) => setTable(list.find((m) => m.gameId === gameId && (m.status === 'seating' || m.status === 'playing')) ?? null),
+      () => setTable(null),
+    )
+  }, [matchStore, gameId])
+  return table
 }

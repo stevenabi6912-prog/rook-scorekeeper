@@ -15,6 +15,11 @@ export interface ChatApi {
   myUid: string
 }
 
+/** Runs a send and turns any failure, thrown or rejected, into a promise rejection. */
+async function trySend(chat: ChatApi, m: Omit<NewChatMessage, 'uid' | 'seat'>): Promise<void> {
+  await chat.send(m)
+}
+
 const MAX_VOICE_MS = 12000
 
 export function ChatPanel({ chat, seats, open, onClose }: { chat: ChatApi; seats: SeatInfo[]; open: boolean; onClose: () => void }) {
@@ -31,11 +36,11 @@ export function ChatPanel({ chat, seats, open, onClose }: { chat: ChatApi; seats
     const t = text.trim()
     if (!t) return
     setText('')
-    Promise.resolve(chat.send({ kind: 'text', text: t.slice(0, 500) })).catch((err: unknown) => setError(errorText(err)))
+    trySend(chat, { kind: 'text', text: t.slice(0, 500) }).catch((err: unknown) => setError(errorText(err)))
   }
 
   const { recording, seconds, supported, start, stop, cancel } = useVoiceRecorder((audio, mimeType, durationMs) =>
-    Promise.resolve(chat.send({ kind: 'voice', text: '🎤 voice note', audio, mimeType, durationMs })).catch((err: unknown) => setError(errorText(err))),
+    trySend(chat, { kind: 'voice', text: '🎤 voice note', audio, mimeType, durationMs }).catch((err: unknown) => setError(errorText(err))),
   )
 
   if (!open) return null
@@ -55,7 +60,7 @@ export function ChatPanel({ chat, seats, open, onClose }: { chat: ChatApi; seats
         {error && <div className="chat-error">{error}</div>}
         <div className="chat-reactions">
           {QUICK_REACTIONS.map((r) => (
-            <button key={r} type="button" className="chat-reaction" onClick={() => Promise.resolve(chat.send({ kind: 'reaction', text: r })).catch((err: unknown) => setError(errorText(err)))}>
+            <button key={r} type="button" className="chat-reaction" onClick={() => trySend(chat, { kind: 'reaction', text: r }).catch((err: unknown) => setError(errorText(err)))}>
               {r}
             </button>
           ))}

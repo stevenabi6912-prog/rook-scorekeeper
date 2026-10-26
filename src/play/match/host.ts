@@ -89,8 +89,11 @@ export function useHostDuties(opts: {
     const after = scoreHand(before, input).totals
     ;(async () => {
       try {
-        // Skip the write if an earlier attempt already landed (the page reloaded mid-way).
-        if (!hands.some((h) => h.handNumber === skHand)) {
+        // Skip the write if an earlier attempt already landed (a reload, or a change of host
+        // right at the end of the hand). Ask the store afresh rather than trusting the
+        // subscription, which may lag.
+        const fresh = await dataStore.getHands(game.id)
+        if (!fresh.some((h) => h.handNumber === skHand)) {
           await dataStore.addHand(game.id, input)
           if (onEvent && teamNames) onEvent(null, describeResult(summarizeHand(state), match.handNumber, teamNames))
         }

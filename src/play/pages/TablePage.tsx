@@ -78,6 +78,17 @@ export function TablePage() {
   }, [match, me, matchStore, presenceAll])
 
   const seatNames = useMemo(() => (match?.seats ?? []).map((s) => byId.get(s.playerId)?.name ?? 'Player'), [match, byId])
+  // Stable callbacks and objects, so the host's timers are not restarted by unrelated re-renders.
+  const onEvent = useCallback(
+    (seat: number | null, text: string) => {
+      matchStore.sendMessage(matchId, { uid: matchStore.uid, seat, kind: 'event', text }).catch(() => undefined)
+    },
+    [matchStore, matchId],
+  )
+  const hostTeamNames = useMemo<Record<TeamId, string>>(
+    () => (game ? { A: game.teams.A.name, B: game.teams.B.name } : { A: 'Team A', B: 'Team B' }),
+    [game],
+  )
   const { isHost } = useHostDuties({
     matchStore,
     dataStore,
@@ -86,9 +97,9 @@ export function TablePage() {
     hands,
     rng,
     turnLimitMs: TURN_LIMIT_MS,
-    onEvent: (seat, text) => matchStore.sendMessage(match!.id, { uid: matchStore.uid, seat, kind: 'event', text }).catch(() => undefined),
+    onEvent,
     seatNames,
-    teamNames: game ? { A: game.teams.A.name, B: game.teams.B.name } : { A: 'Team A', B: 'Team B' },
+    teamNames: hostTeamNames,
   })
 
   const seats: SeatInfo[] = useMemo(
@@ -272,9 +283,9 @@ function LiveTable({
       messages,
       mySeat: me,
       myUid: matchStore.uid,
-      send: (m) => {
+      send: async (m) => {
         if (m.kind === 'voice' && !m.audio) throw new Error('That voice note was too long to send. Keep it under ten seconds.')
-        return matchStore.sendMessage(match.id, { ...m, uid: matchStore.uid, seat: me })
+        await matchStore.sendMessage(match.id, { ...m, uid: matchStore.uid, seat: me })
       },
     }),
     [messages, me, matchStore, match.id],
