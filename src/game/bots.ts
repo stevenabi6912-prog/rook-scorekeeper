@@ -286,25 +286,49 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
   const trump = k.trump!
   const plays = state.trick.plays
   const isTrump = (c: CardId) => effectiveSuit(c, trump) === trump
+  const ourMoon = state.bid === 'moon' && k.bidding
+  const theirMoon = state.bid === 'moon' && !k.bidding
+  // The last trick also carries the Kitty, so it is worth fighting for.
+  const lastTrick = state.hands[seat].length === 1
+  const kittyWorth = lastTrick ? (state.nest.some(isUnknown) ? 15 : state.nest.reduce((n, c) => n + pts(c, rules), 0)) : 0
+  const after = stillToPlay(state, seat)
+  const partnerToCome = after.some((s) => k.partners.includes(s))
+  const opponentToCome = after.some((s) => k.opponents.includes(s))
 
   /* ---- leading */
   if (plays.length === 0) {
     const myTrumps = legal.filter(isTrump)
     const plain = legal.filter((c) => !isTrump(c))
-    // The bidding side draws trumps while it holds the boss and trumps are still out.
-    if (k.bidding && myTrumps.length > 0 && k.trumpsOut > 0) {
-      const top = highest(myTrumps, rules)
-      if (isBoss(top, k, rules) && (myTrumps.length >= 2 || k.trumpsOut <= 2)) return top
-    }
-    // Cash a sure winner, points first, unless an opponent is void in it and could ruff.
+    const topTrump = myTrumps.length ? highest(myTrumps, rules) : null
     const safeBosses = plain.filter((c) => isBoss(c, k, rules) && !k.opponents.some((o) => k.voids[o].has(suitOf(c)!) && k.trumpsOut > 0))
+
+    if (ourMoon) {
+      // Every trick is ours or the Moon is gone: boss trumps first while trumps are out, then boss plain cards.
+      if (topTrump && isBoss(topTrump, k, rules) && k.trumpsOut > 0) return topTrump
+      if (safeBosses.length) return juiciest(safeBosses, rules)
+      if (topTrump && isBoss(topTrump, k, rules)) return topTrump
+      return plain.length ? highest(plain, rules) : highest(myTrumps, rules)
+    }
+    // The bidding side draws trumps while it holds the boss and opponents may still have some;
+    // with a long trump holding it draws from the bottom even without the boss.
+    if (k.bidding && topTrump && k.trumpsOut > 0 && isBoss(topTrump, k, rules) && (myTrumps.length >= 2 || k.trumpsOut <= 2)) return topTrump
+    if (k.bidding && myTrumps.length >= (state.handSize >= 9 ? 5 : 4) && k.trumpsOut >= 2) return lowest(myTrumps, rules)
+    // Cash a sure winner, points first.
     if (safeBosses.length) return juiciest(safeBosses, rules)
-    const bossTrumps = myTrumps.filter((c) => isBoss(c, k, rules))
-    if (bossTrumps.length && (k.trumpsOut > 0 || plain.length === 0)) return highest(bossTrumps, rules)
+    // Lead into a partner's void so they can ruff, when trumps are still out and no opponent is also void there.
+    const ruffSuit = SUITS.find(
+      (su) => su !== trump && k.trumpsOut > 0 && plain.some((c) => suitOf(c) === su) && k.partners.some((p) => k.voids[p].has(su)) && !k.opponents.some((o) => k.voids[o].has(su)),
+    )
+    if (ruffSuit) return cheapest(plain.filter((c) => suitOf(c) === ruffSuit), rules)
+    if (topTrump && isBoss(topTrump, k, rules) && (k.trumpsOut > 0 || plain.length === 0)) return topTrump
     if (plain.length) {
-      // Lead low from a short color, hoping to run out of it; never lead points away.
       const groups = bySuit(plain)
-      const suits = SUITS.filter((s) => groups[s].length > 0).sort((a, b) => groups[a].length - groups[b].length)
+      // Prefer colors no opponent is known to be void in (a ruff would cost us the trick).
+      const candidates = SUITS.filter((su) => groups[su].length > 0 && !(k.trumpsOut > 0 && k.opponents.some((o) => k.voids[o].has(su))))
+      const suits = (candidates.length ? candidates : SUITS.filter((su) => groups[su].length > 0)).sort((a, b) =>
+        k.bidding ? groups[a].length - groups[b].length : groups[b].length - groups[a].length,
+      )
+      // Bidding: lead short colors to make voids. Defending: lead long colors low to wear the bidder down.
       const pool = groups[suits[0]]
       const free = pool.filter((c) => pts(c, rules) === 0)
       return lowest(free.length ? free : pool, rules)
@@ -315,43 +339,60 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
   /* ---- following */
   const currentWinner = trickWinner(state.trick, trump, rules)
   const partnerWinning = k.partners.includes(currentWinner)
-  const last = plays.length === state.handedness - 1
-  const trickPoints = plays.reduce((n, p) => n + pts(p.card, rules), 0)
+  const last = after.length === 0
+  const trickPoints = plays.reduce((n, p) => n + pts(p.card, rules), 0) + kittyWorth
   const winning = legal.filter((c) => winnerIfPlayed(state, seat, c) === seat)
   const safeWinners = winning.filter((c) => last || !opponentCouldBeat(state, k, seat, c))
+  const plainLegal = legal.filter((c) => !isTrump(c))
+  const plainOrAll = plainLegal.length ? plainLegal : legal
+  const dump = () => {
+    // Throw the cheapest card, preferring to empty a short color.
+    const groups = bySuit(plainLegal)
+    const short = SUITS.filter((su) => groups[su].length === 1 && pts(groups[su][0], rules) === 0)
+    if (short.length) return groups[short[0]][0]
+    return cheapest(plainOrAll, rules)
+  }
 
   if (partnerWinning) {
     const partnerCard = plays[plays.findIndex((p) => p.seat === currentWinner)].card
-    const partnerSafe = last || (isBoss(partnerCard, k, rules) && !opponentCouldBeat(state, k, seat, partnerCard))
+    const partnerSafe = last || !opponentToCome || (isBoss(partnerCard, k, rules) && !opponentCouldBeat(state, k, seat, partnerCard))
     // Never ruff your own partner: feed from the plain cards; trumps only if that is all you hold.
-    const plainLegal = legal.filter((c) => !isTrump(c))
     if (partnerSafe) return plainLegal.length ? juiciest(plainLegal, rules) : cheapest(legal, rules)
-    // Partner may yet be beaten: take over only with a sure plain winner when it is worth it,
-    // or with a trump when an opponent could otherwise ruff a fat trick.
-    const plainSafeWinners = safeWinners.filter((c) => !isTrump(c))
-    if (plainSafeWinners.length && trickPoints + pts(juiciest(legal, rules), rules) >= 10) return lowest(plainSafeWinners, rules)
-    if (plainLegal.length === 0 && safeWinners.length && trickPoints >= 10) return lowest(safeWinners, rules)
-    return plainLegal.length ? cheapest(plainLegal, rules) : cheapest(legal, rules)
+    // Partner may yet be beaten by an opponent still to play: take over with a sure plain
+    // winner when the trick is worth it (or the Moon is on the line), else keep it cheap.
+    const plainSafe = safeWinners.filter((c) => !isTrump(c))
+    if (plainSafe.length && (trickPoints >= 10 || ourMoon)) return lowest(plainSafe, rules)
+    if (ourMoon && safeWinners.length) return lowest(safeWinners, rules)
+    return dump()
   }
 
+  // An opponent is winning (or led). Can I take it?
   if (winning.length) {
     if (last) return juiciest(winning, rules)
+    if (theirMoon) return lowest(winning, rules) // any trick we take ends their Moon
+    if (!partnerToCome) {
+      // I am my side's last chance: take it with the smallest sure winner; fight for a fat trick.
+      if (safeWinners.length) {
+        const w = lowest(safeWinners, rules)
+        if (trickPoints === 0 && !k.bidding && !ourMoon && str(w, rules) >= 13 && !isBoss(w, k, rules)) return dump()
+        return w
+      }
+      if (trickPoints >= 10 || ourMoon || (k.bidding && rng() < 0.6)) return lowest(winning, rules)
+      return dump()
+    }
+    // Partner still to play: a sure cheap winner is still worth taking (points are
+    // the game); otherwise keep high cards and let the partner, playing later, decide.
     if (safeWinners.length) {
-      // Take it with the smallest sure winner; if the trick is empty, keep high cards for later.
       const w = lowest(safeWinners, rules)
-      if (trickPoints === 0 && !k.bidding && str(w, rules) >= 13 && !isBoss(w, k, rules)) return cheapest(legal, rules)
+      if (trickPoints === 0 && !k.bidding && !ourMoon && str(w, rules) >= 13 && !isBoss(w, k, rules)) return dump()
       return w
     }
-    // No sure winner. Fight for a fat trick; otherwise keep the powder dry.
-    if (trickPoints >= 10 || (k.bidding && rng() < 0.6)) return lowest(winning, rules)
-    return cheapest(legal, rules)
+    if (ourMoon) return lowest(winning, rules)
+    if (trickPoints >= 10) return lowest(winning, rules)
+    return dump()
   }
 
-  // Cannot win: throw the cheapest card, preferring to empty a short color.
-  const groups = bySuit(legal.filter((c) => !isTrump(c)))
-  const short = SUITS.filter((s) => groups[s].length === 1 && pts(groups[s][0], rules) === 0)
-  if (short.length) return groups[short[0]][0]
-  return cheapest(legal, rules)
+  return dump()
 }
 
 /* ------------------------------------------------------------- decision */
