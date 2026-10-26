@@ -161,13 +161,24 @@ export function botTricks(state: HandState, seat: number, trumpSuit: Suit = botT
 }
 
 /**
- * The highest bid the bot is comfortable with, as a multiple of 5: about 12
- * points a trick, plus what the Kitty and a bidding partner are worth.
+ * The highest bid the bot is comfortable with, as a multiple of 5: points per
+ * trick the bot expects to win itself (scaled by hand size, since a 6-card
+ * hand plays six tricks worth 20 points each), plus what the Kitty, a second
+ * partner, and a bidding partner are worth. The constants come from self-play
+ * in the arena: at these values no dealer is left stuck at 65, the average
+ * bid is about 80 and bids are made four times in five. The old 12 a trick
+ * left six-handed bots passing nine hands in ten.
  */
+const BID_PER_TRICK = 18
+const BID_EXTRA_PARTNER = 20
+
 export function botMaxBid(state: HandState, seat: number): number {
   const { rules } = state
   const tricks = botTricks(state, seat)
-  let est = 10 + tricks * 12
+  const players = state.hands.length
+  const perTrick = BID_PER_TRICK * (9 / Math.max(1, state.handSize))
+  const extraPartners = Math.max(0, players / 2 - 2)
+  let est = 10 + tricks * perTrick + extraPartners * BID_EXTRA_PARTNER
   // Picking up five Kitty cards is usually worth a trick, more if the face-up card helps.
   est += 10
   const top = state.nest[0]
