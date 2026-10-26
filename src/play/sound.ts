@@ -51,7 +51,7 @@ export function unlockAudio() {
       if (document.visibilityState === 'visible' && ctx?.state === 'suspended') void ctx.resume()
     })
   }
-  if (ctx.state === 'suspended') void ctx.resume()
+  if (ctx.state !== 'running') void ctx.resume()
   if (!primed) {
     try {
       const src = ctx.createBufferSource()

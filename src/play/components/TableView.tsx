@@ -296,7 +296,7 @@ export function TableView(props: TableViewProps) {
     : `${state.bid === 'moon' ? 'Moon' : state.bid} · ${seats[state.bidderSeat!].name}`
 
   return (
-    <div className="table-page" onPointerDownCapture={unlockAudio} onTouchStartCapture={unlockAudio}>
+    <div className="table-page" onPointerDownCapture={unlockAudio} onTouchStartCapture={unlockAudio} onTouchEndCapture={unlockAudio} onClickCapture={unlockAudio}>
       <header className="table-top">
         <Link className="icon-btn light" to={backTo} aria-label="Leave table">‹</Link>
         <div className="table-title">
