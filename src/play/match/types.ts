@@ -80,3 +80,16 @@ export interface ChatMessage {
 export type NewChatMessage = Omit<ChatMessage, 'id' | 'createdAt'>
 
 export const QUICK_REACTIONS = ['👍', '😂', '😮', '😤', '🙏', '🐦']
+
+/** A phone that is in the Play tab (or at a table) right now. One document per phone. */
+export interface Presence {
+  uid: string
+  playerId: string
+  /** The table they are sitting at, if any. */
+  tableId: string | null
+  lastSeen: number
+}
+
+/** Seconds between heartbeats, and how long after the last one a phone still counts as here. */
+export const PRESENCE_EVERY_MS = 10_000
+export const PRESENCE_STALE_MS = 35_000

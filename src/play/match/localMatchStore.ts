@@ -1,6 +1,6 @@
 import type { CardId } from '../../game/cards'
 import type { MatchStore, MatchTx } from './store'
-import type { ChatMessage, MatchDoc, NewMatch } from './types'
+import type { ChatMessage, MatchDoc, NewMatch, Presence } from './types'
 
 interface LocalMatchData {
   matches: Record<string, MatchDoc>
@@ -55,6 +55,9 @@ export function createLocalMatchStore(familyCode: string): MatchStore {
   }
   const id = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
   let queue: Promise<unknown> = Promise.resolve()
+  // Presence is only ever this one phone in demo mode.
+  let presence: Presence | null = null
+  const presenceListeners = new Set<() => void>()
 
   return {
     kind: 'local',
@@ -71,6 +74,16 @@ export function createLocalMatchStore(familyCode: string): MatchStore {
     },
     async getSeat(matchId, seat) {
       return data.seats[matchId]?.[seat] ?? []
+    },
+    subscribePresence(cb) {
+      const fn = () => cb(presence ? [presence] : [])
+      presenceListeners.add(fn)
+      fn()
+      return () => presenceListeners.delete(fn)
+    },
+    async setPresence(playerId, tableId) {
+      presence = { uid: deviceId(), playerId, tableId, lastSeen: Date.now() }
+      presenceListeners.forEach((l) => l())
     },
     subscribeMessages(matchId, cb) {
       return listen(() => cb([...(data.messages?.[matchId] ?? [])].sort((a, b) => a.createdAt - b.createdAt).slice(-100)))

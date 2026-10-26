@@ -41,6 +41,16 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // Who is in the Play tab right now: one document per phone, written only
+      // by that phone.
+      match /presence/{presenceId} {
+        allow read: if signedIn() && validCode(code);
+        allow write: if signedIn() && validCode(code)
+          && presenceId == request.auth.uid
+          && request.resource.data.playerId is string
+          && request.resource.data.lastSeen is number;
+      }
+
       // ---------------------------------------------------------------
       // Online play (branch online-play). A match is a table; its public
       // document is readable by the family. Each seat's cards and the Kitty

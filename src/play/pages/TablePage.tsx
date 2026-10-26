@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { botDecision } from '../../game/bots'
 import { Avatar, playerColor } from '../../components/Avatar'
 import { TopBar } from '../../components/Layout'
-import { useMatchStore, useStore } from '../../data/StoreContext'
+import { useMatchStore, useStore, useStoreContext } from '../../data/StoreContext'
 import type { CardId } from '../../game/cards'
 import type { Action } from '../../game/engine'
 import { randomSeed, seededRng } from '../../game/rng'
@@ -14,7 +14,10 @@ import type { Player, TeamId } from '../../lib/types'
 import type { SeatInfo } from '../components/Table'
 import { TableView, type Finished } from '../components/TableView'
 import { scorekeeperHandNumber, useHostDuties } from '../match/host'
-import { claimSeat, commitMove, dealNextHand, mySeats, releaseSeat, seatBots, seatsFilled, setMatchStatus } from '../match/moves'
+import { claimHost, claimSeat, commitMove, dealNextHand, mySeats, releaseSeat, seatBots, seatsFilled, setMatchStatus } from '../match/moves'
+import { loadIdentity } from '../identity'
+import { useHeartbeat, useWhoIsHere } from '../presence'
+import { PRESENCE_STALE_MS } from '../match/types'
 import type { MatchDoc } from '../match/types'
 import { toState } from '../match/view'
 import { describeAction } from '../match/events'
@@ -49,6 +52,30 @@ export function TablePage() {
   const seatsHeld = useMemo(() => (match ? mySeats(match, matchStore.uid) : []), [match, matchStore.uid])
   const [activeSeat, setActiveSeat] = useState<number | null>(null)
   const me = activeSeat !== null && seatsHeld.includes(activeSeat) ? activeSeat : (seatsHeld[0] ?? null)
+
+  // This phone knows who it is: take that seat automatically if it is free.
+  const { familyCode } = useStoreContext()
+  const identity = loadIdentity(familyCode ?? '')
+  useEffect(() => {
+    if (!match || !identity || me !== null) return
+    const seat = match.seats.findIndex((s) => s.playerId === identity && s.uid === null)
+    if (seat >= 0 && (match.status === 'seating' || match.status === 'playing')) {
+      claimSeat(matchStore, match.id, seat).catch(() => undefined)
+    }
+  }, [match, identity, me, matchStore])
+  useHeartbeat(identity, match?.id ?? null)
+
+  // If the host's phone goes quiet, the first seated phone to notice takes over hosting.
+  const { all: presenceAll } = useWhoIsHere()
+  useEffect(() => {
+    if (!match || match.status !== 'playing' || me === null || match.hostUid === matchStore.uid) return
+    const hostPresence = presenceAll.find((p) => p.uid === match.hostUid)
+    const quietFor = Date.now() - (hostPresence?.lastSeen ?? 0)
+    if (hostPresence && quietFor < PRESENCE_STALE_MS + 10_000) return
+    // Stagger by seat so phones do not all try at once.
+    const t = setTimeout(() => claimHost(matchStore, match.id, match.hostUid).catch(() => undefined), 2000 + me * 1500)
+    return () => clearTimeout(t)
+  }, [match, me, matchStore, presenceAll])
 
   const seatNames = useMemo(() => (match?.seats ?? []).map((s) => byId.get(s.playerId)?.name ?? 'Player'), [match, byId])
   const { isHost } = useHostDuties({

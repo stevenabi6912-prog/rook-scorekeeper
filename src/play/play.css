@@ -296,3 +296,9 @@
 }
 .voice-note.playing { border-color: var(--primary); color: var(--primary); }
 .voice-bars { letter-spacing: 1px; font-size: 0.8rem; opacity: 0.7; }
+
+/* Lobby: who's here */
+.who { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+.who.online { color: var(--text); border-color: var(--good); box-shadow: 0 0 0 1px var(--good) inset; }
+.who.online::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-left: 4px; }
+.who-at { font-size: 0.7rem; color: var(--good); margin-left: 2px; }

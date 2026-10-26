@@ -11,8 +11,8 @@ export function PlayersPage() {
   const [editing, setEditing] = useState<string | 'new' | null>(null)
   const [showArchived, setShowArchived] = useState(false)
 
-  const active = (players ?? []).filter((p) => !p.archived)
-  const archived = (players ?? []).filter((p) => p.archived)
+  const active = (players ?? []).filter((p) => !p.archived && !p.bot)
+  const archived = (players ?? []).filter((p) => p.archived && !p.bot)
 
   return (
     <>

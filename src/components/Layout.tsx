@@ -5,7 +5,7 @@ export function Layout() {
     <div className="app">
       <Outlet />
       <nav className="bottom-nav" aria-label="Main">
-        <NavLink to="/" end><span className="ico">🃏</span>Games</NavLink>
+        <NavLink to="/" end><span className="ico">🃏</span>Score</NavLink>
         <NavLink to="/play"><span className="ico">🎴</span>Play</NavLink>
         <NavLink to="/players"><span className="ico">👥</span>Players</NavLink>
         <NavLink to="/stats"><span className="ico">📊</span>Stats</NavLink>

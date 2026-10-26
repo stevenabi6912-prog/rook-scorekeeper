@@ -12,7 +12,7 @@ export function StatsPage() {
   const rows = useMemo(() => {
     if (!players || !games || !handsByGame) return null
     return computePlayerStats(players, games, handsByGame)
-      .filter((s) => s.gamesPlayed > 0 || !byId.get(s.playerId)?.archived)
+      .filter((s) => !byId.get(s.playerId)?.bot && (s.gamesPlayed > 0 || !byId.get(s.playerId)?.archived))
       .sort((a, b) => b.wins - a.wins || b.gamesPlayed - a.gamesPlayed || (byId.get(a.playerId)?.name ?? '').localeCompare(byId.get(b.playerId)?.name ?? ''))
   }, [players, games, handsByGame, byId])
 

@@ -64,8 +64,11 @@ function GameCard({ game, hands, byId, onClick }: { game: Game; hands: Hand[] | 
     <div className="card tappable" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
       <div className="row between">
         <span className="muted small">{date} · {game.handedness}-handed{summary ? ` · ${summary.handCount} hand${summary.handCount === 1 ? '' : 's'}` : ''}</span>
-        {game.status === 'finished' && game.winner && <span className={`badge team-${game.winner}`}>Winner: {game.teams[game.winner].name}</span>}
-        {game.status === 'active' && <span className="badge good">Live</span>}
+        <span className="row" style={{ gap: 4 }}>
+          {game.mode === 'online' && <span className="badge neutral">Online</span>}
+          {game.status === 'finished' && game.winner && <span className={`badge team-${game.winner}`}>Winner: {game.teams[game.winner].name}</span>}
+          {game.status === 'active' && <span className="badge good">Live</span>}
+        </span>
       </div>
       {(['A', 'B'] as const).map((t) => (
         <div key={t} className="row between" style={{ marginTop: 8 }}>

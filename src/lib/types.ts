@@ -8,6 +8,8 @@ export interface Player {
   emoji?: string
   color?: string
   archived: boolean
+  /** A computer player seated at online tables; hidden from the Players list and stats. */
+  bot?: boolean
   createdAt: number
 }
 
@@ -18,6 +20,9 @@ export interface Team {
 
 export type GameStatus = 'active' | 'finished'
 
+/** How the hands get in: typed at the table, or played on phones. Older games have no mode and are in person. */
+export type GameMode = 'inPerson' | 'online'
+
 export interface Game {
   id: string
   handedness: Handedness
@@ -26,6 +31,7 @@ export interface Game {
   seatOrder: string[]
   firstDealerId: string
   status: GameStatus
+  mode?: GameMode
   winner?: TeamId | null
   /** Trump for the hand being played right now, set from the live screen so
    *  every phone shows it. Cleared when that hand is saved. */

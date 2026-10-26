@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   runTransaction,
+  setDoc,
   writeBatch,
   type DocumentData,
   type Firestore,
@@ -16,7 +17,7 @@ import {
 import type { CardId } from '../../game/cards'
 import { clean } from '../../data/store'
 import type { MatchStore, MatchTx } from './store'
-import type { ChatMessage, MatchDoc, NewMatch } from './types'
+import type { ChatMessage, MatchDoc, NewMatch, Presence } from './types'
 
 const asDoc = <T>(snap: QueryDocumentSnapshot<DocumentData>): T => ({ id: snap.id, ...snap.data() }) as T
 
@@ -34,6 +35,7 @@ export function createFirestoreMatchStore(db: Firestore, uid: string, familyCode
   const seatDoc = (id: string, seat: number) => doc(matches, id, 'seats', String(seat))
   const nestDoc = (id: string) => doc(matches, id, 'nest', 'current')
   const messagesCol = (id: string) => collection(matches, id, 'messages')
+  const presenceCol = collection(family, 'presence')
 
   return {
     kind: 'firestore',
@@ -59,6 +61,12 @@ export function createFirestoreMatchStore(db: Firestore, uid: string, familyCode
     async getSeat(matchId, seat) {
       const snap = await getDoc(seatDoc(matchId, seat))
       return snap.exists() ? ((snap.data().cards as CardId[]) ?? []) : []
+    },
+    subscribePresence(cb, onError) {
+      return onSnapshot(presenceCol, (snap) => cb(snap.docs.map((d) => ({ uid: d.id, ...d.data() }) as Presence)), onError)
+    },
+    async setPresence(playerId, tableId) {
+      await setDoc(doc(presenceCol, uid), { playerId, tableId, lastSeen: Date.now() })
     },
     subscribeMessages(matchId, cb, onError) {
       // Newest 100 by the index order, handed back oldest first.

@@ -127,3 +127,18 @@ export function seatsFilled(match: MatchDoc): boolean {
 export function mySeats(match: MatchDoc, uid: string): number[] {
   return match.seats.flatMap((s, i) => (s.uid === uid ? [i] : []))
 }
+
+/**
+ * Take over as host when the current host's phone has gone quiet. Any seated
+ * phone may do this; the transaction makes sure only one does. The caller
+ * decides "gone quiet" from presence (no heartbeat for a while).
+ */
+export async function claimHost(store: MatchStore, matchId: string, fromUid: string): Promise<boolean> {
+  return store.transact(matchId, async (tx) => {
+    const match = await tx.getMatch()
+    if (match.hostUid !== fromUid) return false // someone else already took over
+    if (!match.seats.some((s) => s.uid === store.uid)) throw new Error('Only a seated player can host.')
+    tx.setMatch({ hostUid: store.uid })
+    return true
+  })
+}

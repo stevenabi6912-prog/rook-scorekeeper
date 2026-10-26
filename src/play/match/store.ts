@@ -1,6 +1,6 @@
 import type { CardId } from '../../game/cards'
 import type { Unsubscribe } from '../../data/store'
-import type { ChatMessage, MatchDoc, NewChatMessage, NewMatch } from './types'
+import type { ChatMessage, MatchDoc, NewChatMessage, NewMatch, Presence } from './types'
 
 /**
  * Reads and writes inside one atomic move. Reads happen first; writes are
@@ -35,6 +35,11 @@ export interface MatchStore {
   /** The latest table chat, oldest first. */
   subscribeMessages(matchId: string, cb: (messages: ChatMessage[]) => void, onError?: (e: Error) => void): Unsubscribe
   sendMessage(matchId: string, m: NewChatMessage): Promise<void>
+
+  /** Everyone's presence documents (the caller decides who still counts as here). */
+  subscribePresence(cb: (list: Presence[]) => void, onError?: (e: Error) => void): Unsubscribe
+  /** This phone's heartbeat. */
+  setPresence(playerId: string, tableId: string | null): Promise<void>
 
   createMatch(m: NewMatch): Promise<string>
   deleteMatch(id: string): Promise<void>

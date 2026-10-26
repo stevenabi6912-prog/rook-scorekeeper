@@ -21,7 +21,7 @@ export function NewGamePage() {
   const [err, setErr] = useState<string | null>(null)
 
   const perTeam = handedness / 2
-  const active = useMemo(() => (players ?? []).filter((p) => !p.archived), [players])
+  const active = useMemo(() => (players ?? []).filter((p) => !p.archived && !p.bot), [players])
 
   const teams = useMemo(() => {
     const A = active.filter((p) => assignment[p.id] === 'A').map((p) => p.id)
@@ -73,6 +73,7 @@ export function NewGamePage() {
     setErr(null)
     try {
       const id = await store.createGame({
+        mode: 'inPerson',
         handedness,
         teams: { A: { ...teams.A, name: names.A.trim() }, B: { ...teams.B, name: names.B.trim() } },
         seatOrder,
