@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../../components/Avatar'
+import { InviteButton } from '../../components/InviteButton'
 import { TopBar } from '../../components/Layout'
 import { useMatchStore, useStore, useStoreContext } from '../../data/StoreContext'
 import { ROOK } from '../../game/cards'
@@ -99,6 +100,12 @@ export function PlayLobbyPage() {
             })}
             {people.length === 0 && <span className="muted small">Nobody yet.</span>}
           </div>
+          {!demoMode && familyCode && (
+            <div style={{ marginTop: 10 }}>
+              <InviteButton code={familyCode} />
+              <p className="small muted center" style={{ marginTop: 6 }}>They tap the link, pick their name, and they're in.</p>
+            </div>
+          )}
         </section>
 
         <section className="section">

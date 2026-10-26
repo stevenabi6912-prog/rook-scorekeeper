@@ -1,19 +1,40 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { normalizeFamilyCode, validateFamilyCode } from '../data/family'
 import { useStoreContext } from '../data/StoreContext'
+import { consumeInvite } from '../lib/invite'
 
 /**
  * Wraps the whole app. Shows the passcode form until a family is joined and
- * Firebase (or the local demo store) is ready.
+ * Firebase (or the local demo store) is ready. An invite link joins its
+ * family straight away; a phone already in a different family is asked first.
  */
 export function PasscodeGate({ children }: { children: ReactNode }) {
   const { familyCode, state, error, store, firebaseConfigured, demoMode, join, leave } = useStoreContext()
   const [input, setInput] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [invite, setInvite] = useState<string | null>(() => consumeInvite())
+
+  useEffect(() => {
+    if (!invite) return
+    if (!familyCode) join(invite)
+    if (!familyCode || familyCode === invite) setInvite(null)
+  }, [invite, familyCode, join])
+
+  if (invite && familyCode && familyCode !== invite) {
+    return (
+      <div className="gate">
+        <div className="logo"><img src={`${import.meta.env.BASE_URL}pwa-192.png`} alt="" width="72" height="72" style={{ borderRadius: 16 }} /></div>
+        <h1>Rook</h1>
+        <p className="sub">You were invited to <strong>{invite}</strong>. This phone is in <strong>{familyCode}</strong>.</p>
+        <button className="btn primary big block" onClick={() => { join(invite); setInvite(null) }}>Switch to {invite}</button>
+        <button className="btn ghost block" onClick={() => setInvite(null)}>Stay in {familyCode}</button>
+      </div>
+    )
+  }
 
   if (familyCode && store && state === 'ready') return <>{children}</>
 
-  if (familyCode && state === 'connecting') {
+  if ((familyCode && state === 'connecting') || (invite && !familyCode)) {
     return (
       <div className="gate">
         <div className="logo"><img src={`${import.meta.env.BASE_URL}pwa-192.png`} alt="" width="72" height="72" style={{ borderRadius: 16 }} /></div>

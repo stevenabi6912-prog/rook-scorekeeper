@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Dialog } from '../components/Dialog'
+import { InviteButton } from '../components/InviteButton'
 import { TopBar } from '../components/Layout'
 import { useStoreContext } from '../data/StoreContext'
 
@@ -20,6 +21,11 @@ export function SettingsPage() {
                 : 'Firebase is not configured, so data is stored only in this browser.'
               : 'Live: synced through Firebase to every phone using this passcode.'}
           </p>
+          {!demoMode && familyCode && (
+            <div style={{ marginBottom: 8 }}>
+              <InviteButton code={familyCode} />
+            </div>
+          )}
           <button className="btn block" onClick={() => setConfirm(true)}>Switch family passcode</button>
         </div>
         <div className="card">
