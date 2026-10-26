@@ -23,7 +23,7 @@ export function scorekeeperHandNumber(match: MatchDoc): number {
 
 const BOT_DELAY_MS = 900
 /** Extra time past the clock before the host moves for an absent person (their own phone gets first go). */
-const GRACE_MS = 4000
+const GRACE_MS = 20000
 
 export function useHostDuties(opts: {
   matchStore: MatchStore
@@ -37,6 +37,9 @@ export function useHostDuties(opts: {
   const { matchStore, dataStore, match, game, hands, rng, turnLimitMs } = opts
   const isHost = !!match && match.hostUid === matchStore.uid
   const scoringRef = useRef<number | null>(null)
+  // When this phone first saw each decision, so the takeover clock does not
+  // depend on another device's clock being in step with ours.
+  const seenRef = useRef<{ key: string; at: number } | null>(null)
 
   // Bots, and people whose clock ran out.
   useEffect(() => {
@@ -44,7 +47,10 @@ export function useHostDuties(opts: {
     const pub = match.pub
     const seat = pub.turnSeat
     const info = match.seats[seat]
-    const delay = info.bot ? BOT_DELAY_MS + rng() * 500 : Math.max(0, match.turnStartedAt + turnLimitMs + GRACE_MS - Date.now())
+    const key = `${match.handNumber}:${pub.phase}:${pub.tricks.length}:${pub.trick.plays.length}:${pub.bidding.calls.length}:${pub.nestPickedUp}:${seat}`
+    if (seenRef.current?.key !== key) seenRef.current = { key, at: Date.now() }
+    const sinceSeen = Date.now() - seenRef.current.at
+    const delay = info.bot ? BOT_DELAY_MS + rng() * 500 : Math.max(0, turnLimitMs + GRACE_MS - sinceSeen)
     const timer = setTimeout(() => {
       commitMove(matchStore, match.id, seat, (state) => botDecision(state, seat, rng, info.bot ? {} : { overshootAccept: false })).catch(() => {
         /* another phone moved first, or the move was refused; the next snapshot re-evaluates */

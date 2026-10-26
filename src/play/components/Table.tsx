@@ -67,12 +67,7 @@ export function Table({ state, me, seats, bubbles, sweep }: TableProps) {
   return (
     <div className="table-area" ref={ref} style={state.trump ? { ['--trump' as string]: CARD_INK[state.trump] } : undefined}>
       <div className={`felt-edge${state.trump ? ' has-trump' : ''}`} aria-hidden />
-      {state.trump && (
-        <div className="trump-marker" aria-label={`${state.trump} is trump`}>
-          <span className="trump-swatch" style={{ background: CARD_INK[state.trump] }} />
-          <span>{state.trump} trump</span>
-        </div>
-      )}
+
       {seats.map((info, seat) => {
         const k = rel(seat)
         if (k === 0) return null

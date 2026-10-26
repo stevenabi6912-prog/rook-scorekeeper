@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { botDecision } from '../../game/bots'
 import type { CardId } from '../../game/cards'
-import { canClaimRest, legalBids, legalPlays, type Action, type BidAction, type HandState } from '../../game/engine'
+import { applyAction, canClaimRest, legalBids, legalPlays, type Action, type BidAction, type HandState } from '../../game/engine'
 import type { Rng } from '../../game/rng'
 import { tallies, type HandResult } from '../../game/score'
 import type { HandOutcome, Scores } from '../../lib/scoring'
@@ -40,7 +40,9 @@ export interface TableViewProps {
   rng: Rng
   /** Milliseconds a person gets per decision before the table decides for them. */
   turnLimitMs: number
-  /** When the current decision started (server time), for a clock that survives reloads. */
+  /** When the current decision started according to whoever moved last. Only a hint:
+   *  the clock runs from when THIS phone first sees its turn, so other devices'
+   *  clocks and network lag cannot shorten it. */
   turnStartedAt?: number
   /** The computer plays this seat (watching, testing). */
   autopilot?: boolean
@@ -62,7 +64,12 @@ const REST_MS = 900
 const SWEEP_MS = 450
 
 export function TableView(props: TableViewProps) {
-  const { state, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, turnStartedAt, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange } = props
+  const { state: serverState, me, seats, teamNames, totals, handNumber, act, rng, turnLimitMs, autopilot, finished, gameOver, onNext, waitingFor, backTo, notice, onBusyChange } = props
+  // A move shows on screen the instant it is made; the server's view replaces
+  // it when the next snapshot arrives (or the move is refused).
+  const [optimistic, setOptimistic] = useState<HandState | null>(null)
+  useEffect(() => setOptimistic(null), [serverState])
+  const state = optimistic ?? serverState
   const [selected, setSelected] = useState<CardId[]>([])
   const [sweep, setSweep] = useState<Sweep | null>(null)
   const [muted, setMutedState] = useState(isMuted())
@@ -77,10 +84,22 @@ export function TableView(props: TableViewProps) {
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange])
 
   const run = (action: Action) => {
+    const preview = applyAction(state, action)
+    if (!preview.ok) {
+      setToast(preview.error)
+      return
+    }
+    setOptimistic(preview.state)
     try {
       const r = act(action)
-      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch((e: unknown) => setToast(errorText(e)))
+      if (r && typeof (r as Promise<void>).catch === 'function') {
+        ;(r as Promise<void>).catch((e: unknown) => {
+          setOptimistic(null)
+          setToast(errorText(e))
+        })
+      }
     } catch (e) {
+      setOptimistic(null)
       setToast(errorText(e))
     }
   }
@@ -179,14 +198,15 @@ export function TableView(props: TableViewProps) {
     return () => clearTimeout(t)
   }, [toast])
 
-  // Clock on my decisions; when it runs out the bot logic decides for me.
+  // Clock on my decisions, from the moment this phone sees it is my turn;
+  // when it runs out the bot logic decides for me.
   const decisionKey = `${handNumber}:${state.phase}:${state.tricks.length}:${state.trick.plays.length}:${state.bidding.calls.length}:${state.nestPickedUp}`
   useEffect(() => {
     if (!myTurn) {
       setSecondsLeft(null)
       return
     }
-    const deadline = (turnStartedAt ?? Date.now()) + turnLimitMs
+    const deadline = Date.now() + turnLimitMs
     const update = () => setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
     update()
     const tick = setInterval(update, 250)
@@ -204,7 +224,7 @@ export function TableView(props: TableViewProps) {
       clearTimeout(fire)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myTurn, decisionKey, turnStartedAt, turnLimitMs, me])
+  }, [myTurn, decisionKey, turnLimitMs, me])
 
   const exchanging = state.phase === 'nest' && myTurn && state.nestPickedUp > 0
   const claimable = myTurn && canClaimRest(state, me)
@@ -253,7 +273,7 @@ export function TableView(props: TableViewProps) {
             <span className="score team-B">{totals.B}</span>
           </div>
         </div>
-        <span className="top-chip">{bidLabel}</span>
+        {(state.bid !== null || state.bidding.highBid !== null) && <span className="top-chip">{bidLabel}</span>}
         <TrumpChip trump={state.trump} />
         <button
           type="button"

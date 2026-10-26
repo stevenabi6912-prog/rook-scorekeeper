@@ -136,7 +136,7 @@ export function HandSummary({
 }
 
 export function TrumpChip({ trump }: { trump: Suit | null }) {
-  if (!trump) return <span className="top-chip muted-chip">Trump ?</span>
+  if (!trump) return null
   return (
     <span className="top-chip trump-pill" style={{ background: CARD_INK[trump] }}>
       <TrumpDot trump={trump} /> {trump.toUpperCase()} TRUMP
