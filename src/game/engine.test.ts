@@ -557,6 +557,44 @@ describe('playing a hand', () => {
     expect(s.hands.every((h) => h.length === 0)).toBe(true)
   })
 
+  it('scores the hidden Kitty right when the last card played is a point card', () => {
+    // Full deck so "what is left of 120" is meaningful: seat 0 plays with everything else hidden.
+    const full = startHand({ rules: R, handedness: 4, teams: TEAMS4, dealerSeat: 3, seed: 'hidden-kitty' })
+    // Play the whole hand with all cards known, then replay the final play with
+    // other hands and the Kitty hidden, as a phone online would see it.
+    const rng = seededRng('hk')
+    let s = full
+    while (s.phase === 'bidding' || s.phase === 'overshoot') {
+      if (s.phase === 'overshoot') s = mustApply(s, { type: 'overshoot', seat: s.dealerSeat, accept: false })
+      else {
+        const o = legalBids(s, s.turnSeat)
+        s = mustApply(s, bid(s.turnSeat, o[0]))
+      }
+    }
+    s = mustApply(s, { type: 'pickup', seat: s.bidderSeat! })
+    s = mustApply(s, { type: 'discard', seat: s.bidderSeat!, cards: botDiscard(s, s.bidderSeat!) })
+    s = mustApply(s, { type: 'trump', seat: s.bidderSeat!, trump: 'red' })
+    let before = s
+    while (s.phase === 'playing') {
+      before = s
+      const options = legalPlays(s, s.turnSeat)
+      // On the very last play prefer a point card, the case that went wrong.
+      const pointy = options.find((c) => c === ROOK || /^[RYGB](5|10|14)$/.test(c))
+      s = mustApply(s, play(s.turnSeat, pointy && s.hands.every((h) => h.length <= 1) ? pointy : options[Math.floor(rng() * options.length)]))
+    }
+    const known = s.tricks.reduce((n, t) => n + t.points, 0)
+    expect(known).toBe(120)
+    // Now the same final play from the mover's hidden view.
+    const mover = before.turnSeat
+    const hidden = {
+      ...before,
+      hands: before.hands.map((h, i) => (i === mover ? h : h.map(() => UNKNOWN))),
+      nest: before.nest.map(() => UNKNOWN),
+    }
+    const last = mustApply(hidden, play(mover, before.hands[mover][0]))
+    expect(last.tricks.reduce((n, t) => n + t.points, 0)).toBe(120)
+  })
+
   it('a broken Moon plays on by default but can end the hand early', () => {
     const hands: CardId[][] = [
       ['G14', 'R6'],

@@ -376,7 +376,8 @@ function applyPlay(state: HandState, seat: number, card: CardId): Result {
   const lastTrick = hands.every((h) => h.length === 0)
   const tookNest = lastTrick && rules.nestToLastTrick
   const inTrick = pointsIn(trick.plays.map((p) => p.card), rules)
-  const points = inTrick + (tookNest ? nestPoints(state, inTrick) : 0)
+  // Count the Kitty against the hands as they are AFTER this card leaves.
+  const points = inTrick + (tookNest ? nestPoints({ ...state, hands }, inTrick) : 0)
   const tricks = [...state.tricks, { ...trick, winnerSeat, points, tookNest }]
 
   const moonBroken =
