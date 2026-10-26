@@ -101,12 +101,11 @@ export function TableView(props: TableViewProps) {
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange])
 
   const run = (action: Action) => {
+    // Show the move at once when this phone can work it out; some moves (picking
+    // up the Kitty, whose cards only the server holds) cannot be previewed here,
+    // so the move is always sent and the server has the final say.
     const preview = applyAction(state, action)
-    if (!preview.ok) {
-      setToast(preview.error)
-      return
-    }
-    setOptimistic(preview.state)
+    if (preview.ok) setOptimistic(preview.state)
     try {
       const r = act(action)
       if (r && typeof (r as Promise<void>).catch === 'function') {
