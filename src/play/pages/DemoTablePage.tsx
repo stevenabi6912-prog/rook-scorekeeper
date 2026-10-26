@@ -62,10 +62,10 @@ const BOT_DELAY = 750
 /** A person gets this long per decision; then the table picks for them. */
 export const TURN_LIMIT_MS = 60_000
 
-/** `#/play/demo?players=6` seats five bots instead of three; `?auto` lets the bots play your seat. */
+/** Six players by default; `#/play/demo?players=4` seats three bots instead of five; `?auto` lets the bots play your seat. */
 export function DemoTablePage() {
   const [params] = useSearchParams()
-  const handedness: Handedness = params.get('players') === '6' ? 6 : 4
+  const handedness: Handedness = params.get('players') === '4' ? 4 : 6
   const autopilot = params.has('auto')
   const cfg = useMemo(() => tableConfig(handedness, autopilot), [handedness, autopilot])
   // Remount on a different table size so every piece of state starts over.

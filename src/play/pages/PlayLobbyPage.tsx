@@ -156,8 +156,8 @@ export function PlayLobbyPage() {
 
         <section className="section">
           <div className="row" style={{ gap: 8 }}>
-            <Link className="btn big grow" to="/play/demo">🤖 Practice against bots</Link>
-            <Link className="btn big" to="/play/demo?players=6" aria-label="Practice, 6 players">6 up</Link>
+            <Link className="btn big grow" to="/play/demo?players=6">🤖 Practice against bots</Link>
+            <Link className="btn big" to="/play/demo?players=4" aria-label="Practice, 4 players">4 up</Link>
           </div>
           <p className="small muted center" style={{ marginTop: 6 }}>Just you and the computer, on this phone. Nothing is saved.</p>
         </section>
@@ -177,9 +177,9 @@ function StartTable({
   onCancel: () => void
   onStart: (input: { handedness: Handedness; teams: Record<TeamId, Participant[]>; hostPlayerId: string }) => void
 }) {
-  const [handedness, setHandedness] = useState<Handedness>(4)
+  const [handedness, setHandedness] = useState<Handedness>(6)
   // Chosen people in the order they were tapped: me first, then whoever is here.
-  const [chosen, setChosen] = useState<string[]>(() => [me, ...people.filter((p) => p.id !== me && here.has(p.id)).map((p) => p.id)].slice(0, 4))
+  const [chosen, setChosen] = useState<string[]>(() => [me, ...people.filter((p) => p.id !== me && here.has(p.id)).map((p) => p.id)].slice(0, 6))
   const [busy, setBusy] = useState(false)
   const [swap, setSwap] = useState<Set<string>>(new Set())
 
@@ -217,7 +217,7 @@ function StartTable({
     <div className="card stack" style={{ marginTop: 10 }}>
       <div><strong>Start a table</strong></div>
       <div className="chips grid-2">
-        {([4, 6] as Handedness[]).map((h) => (
+        {([6, 4] as Handedness[]).map((h) => (
           <button key={h} type="button" className={`chip${handedness === h ? ' selected' : ''}`} onClick={() => setHandedness(h)}>{h} players</button>
         ))}
       </div>

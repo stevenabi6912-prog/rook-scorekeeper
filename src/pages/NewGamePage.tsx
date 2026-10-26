@@ -11,7 +11,7 @@ export function NewGamePage() {
   const store = useStore()
   const navigate = useNavigate()
   const { players, byId, loading } = usePlayers()
-  const [handedness, setHandedness] = useState<Handedness>(4)
+  const [handedness, setHandedness] = useState<Handedness>(6)
   const [assignment, setAssignment] = useState<Record<string, TeamId>>({})
   const [seatOrder, setSeatOrder] = useState<string[]>([])
   const [firstDealerId, setFirstDealerId] = useState<string>('')
