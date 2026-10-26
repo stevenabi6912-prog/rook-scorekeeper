@@ -205,7 +205,8 @@
 
 .hand-fan { position: relative; width: 100%; }
 .hand-slot { position: absolute; transition: top 0.18s ease, transform 0.18s ease; transform-origin: 50% 110%; }
-.hand-slot.selected { top: -4px !important; }
+.hand-slot.selected { top: -10px !important; }
+.hand-slot.selected .rook-card { box-shadow: var(--card-shadow), 0 0 0 2px #ffd54a; }
 .hand-fan.disabled .hand-slot { filter: brightness(0.92); }
 
 /* Toast and summary */

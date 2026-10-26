@@ -55,7 +55,8 @@ export function HandFan({ cards, trump, legal, selected, onSelect, disabled }: H
             style={{
               left: left0 + i * step,
               top: 14 + lift,
-              zIndex: isSelected ? 50 : i,
+              // Chosen cards lift but keep their place in the fan, so neighbours stay visible.
+              zIndex: i,
               transform: `rotate(${rot}deg)`,
               ...(isTrump && trump ? { ['--trump' as string]: CARD_INK[trump] } : {}),
             }}
