@@ -208,14 +208,16 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .banner .btn { margin-top: 10px; }
 
 /* Hand table */
-.hand-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-size: 0.9rem; }
+.hand-table { width: 100%; table-layout: fixed; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-size: 0.9rem; }
 .hand-table th, .hand-table td { padding: 8px 6px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
 .hand-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--surface-2); }
 .hand-table tr:last-child td { border-bottom: none; }
 .hand-table tbody tr { cursor: pointer; }
 .hand-table tbody tr:active { background: var(--surface-2); }
-.hand-table .num { width: 26px; color: var(--muted); font-weight: 700; }
-.hand-table .score-col { width: 64px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hand-table .num { width: 24px; color: var(--muted); font-weight: 700; }
+/* Fixed-width score columns: the hand column gets the rest, and long team names wrap in the header instead of squeezing it. */
+.hand-table .score-col { width: 72px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hand-table th.score-col { white-space: normal; overflow-wrap: break-word; letter-spacing: 0.02em; line-height: 1.2; }
 .hand-table .delta { font-size: 0.85rem; }
 .hand-table .delta.pos { color: var(--good); }
 .hand-table .delta.neg { color: var(--bad); }

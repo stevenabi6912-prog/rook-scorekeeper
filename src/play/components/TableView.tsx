@@ -70,6 +70,8 @@ export interface TableViewProps {
 }
 
 const NO_MESSAGES: ChatApi['messages'] = []
+/** How long a chat line stays popped up over the table. */
+const POP_MS = 4000
 const REST_MS = 900
 const SWEEP_MS = 450
 const REVEAL_MS = 4200
@@ -329,9 +331,15 @@ export function TableView(props: TableViewProps) {
     lastMsgRef.current = last.id
     if (!first && last.kind !== 'event' && !(last.uid === chat?.myUid && last.seat === chat?.mySeat)) sounds.message()
     setNow(Date.now())
-    const t = setTimeout(() => setNow(Date.now()), 5200)
+    const t = setTimeout(() => setNow(Date.now()), POP_MS + 200)
     return () => clearTimeout(t)
   }, [messages, chat?.myUid, chat?.mySeat])
+  // Other people's lines pop up over the table for a few seconds, full text,
+  // so nobody has to open the chat to see them. Tapping one opens the chat.
+  const pops = useMemo(
+    () => messages.slice(-4).filter((m) => m.kind !== 'event' && m.seat !== null && now - m.createdAt <= POP_MS && !(m.uid === chat?.myUid && m.seat === chat?.mySeat)),
+    [messages, now, chat?.myUid, chat?.mySeat],
+  )
   useEffect(() => {
     if (chatOpen) setSeenCount(messages.length)
   }, [chatOpen, messages.length])
@@ -339,7 +347,7 @@ export function TableView(props: TableViewProps) {
   const chatBubbles = useMemo(() => {
     const out: Record<number, ReactNode> = {}
     for (const m of messages.slice(-6)) {
-      if (m.kind === 'event' || m.seat === null || now - m.createdAt > 5000) continue
+      if (m.kind === 'event' || m.seat === null || now - m.createdAt > POP_MS) continue
       out[m.seat] = m.kind === 'voice' ? '🎤' : m.text.length > 28 ? m.text.slice(0, 26) + '…' : m.text
     }
     return out
@@ -457,6 +465,22 @@ export function TableView(props: TableViewProps) {
       </div>
 
       {toast && <div className="toast">{toast}</div>}
+      {pops.length > 0 && (
+        <div className="chat-pops" onClick={() => setChatOpen(true)} role="status">
+          {pops.map((m) => {
+            const info = m.seat !== null ? seats[m.seat] : undefined
+            return (
+              <div key={m.id} className="chat-pop">
+                <span className="seat-avatar" style={{ background: info?.color }} aria-hidden>{info?.emoji ?? info?.name.charAt(0)}</span>
+                <div className="chat-pop-body">
+                  <div className={`chat-pop-name team-${info?.team ?? 'A'}`}>{info?.name ?? 'Table'}</div>
+                  <div className={`chat-pop-text${m.kind === 'reaction' ? ' reaction' : ''}`}>{m.kind === 'voice' ? '🎤 Voice note. Tap to listen.' : m.text}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {chat && <ChatPanel chat={chat} seats={seats} open={chatOpen} onClose={() => setChatOpen(false)} />}
 
