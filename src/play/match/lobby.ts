@@ -16,14 +16,15 @@ const BOT_COLORS = ['#d9480f', '#2f9e44', '#9c36b5', '#0ca678', '#e03131']
 export type Participant = { kind: 'player'; playerId: string } | { kind: 'bot'; index: number }
 
 /** Bot players live in the players collection (hidden), so games can refer to them like anyone else. */
-export async function ensureBotPlayers(dataStore: DataStore, players: Player[], count: number): Promise<string[]> {
+export async function ensureBotPlayers(dataStore: DataStore, players: Player[], count: number): Promise<{ id: string; name: string }[]> {
   const existing = players.filter((p) => p.bot && !p.archived).sort((a, b) => a.createdAt - b.createdAt)
-  const ids = existing.map((p) => p.id)
-  for (let i = ids.length; i < count; i++) {
+  const bots = existing.map((p) => ({ id: p.id, name: p.name }))
+  for (let i = bots.length; i < count; i++) {
     const name = `${BOT_NAMES[i % BOT_NAMES.length]} 🤖`
-    ids.push(await dataStore.addPlayer({ name, emoji: BOT_EMOJIS[i % BOT_EMOJIS.length], color: BOT_COLORS[i % BOT_COLORS.length], bot: true }))
+    const id = await dataStore.addPlayer({ name, emoji: BOT_EMOJIS[i % BOT_EMOJIS.length], color: BOT_COLORS[i % BOT_COLORS.length], bot: true })
+    bots.push({ id, name })
   }
-  return ids.slice(0, count)
+  return bots.slice(0, count)
 }
 
 export interface StartTableInput {
@@ -41,12 +42,13 @@ export async function startTable(
   input: StartTableInput,
 ): Promise<{ gameId: string; matchId: string }> {
   const botCount = [...input.teams.A, ...input.teams.B].filter((p) => p.kind === 'bot').length
-  const botIds = await ensureBotPlayers(dataStore, players, botCount)
+  const bots = await ensureBotPlayers(dataStore, players, botCount)
+  const botIds = bots.map((b) => b.id)
   let bot = 0
   const resolve = (p: Participant) => (p.kind === 'player' ? p.playerId : botIds[bot++])
   const teamIds: Record<TeamId, string[]> = { A: input.teams.A.map(resolve), B: input.teams.B.map(resolve) }
-  const byId = new Map(players.map((p) => [p.id, p]))
-  const nameOf = (id: string) => byId.get(id)?.name.replace(' 🤖', '') ?? BOT_NAMES[0]
+  const names = new Map<string, string>([...players.map((p) => [p.id, p.name] as const), ...bots.map((b) => [b.id, b.name] as const)])
+  const nameOf = (id: string) => (names.get(id) ?? 'Bot').replace(' 🤖', '')
   const teams = {
     A: { name: autoTeamName(teamIds.A.map(nameOf)), playerIds: teamIds.A },
     B: { name: autoTeamName(teamIds.B.map(nameOf)), playerIds: teamIds.B },
