@@ -33,6 +33,8 @@ interface Knowledge {
   voids: Record<number, Set<Suit>>
   /** Unseen trumps (the Rook counts). */
   trumpsOut: number
+  /** Unseen trumps an opponent could still hold: 0 once every opponent has shown void in trump. */
+  oppTrumps: number
   partners: number[]
   opponents: number[]
   bidding: boolean
@@ -58,11 +60,13 @@ function know(state: HandState, seat: number): Knowledge {
     if (s === seat) continue
     ;(state.teams[s] === myTeam ? partners : opponents).push(s)
   }
+  const trumpsOut = trump ? unseen.filter((c) => effectiveSuit(c, trump) === trump).length : 0
   return {
     trump,
     unseen,
     voids,
-    trumpsOut: trump ? unseen.filter((c) => effectiveSuit(c, trump) === trump).length : 0,
+    trumpsOut,
+    oppTrumps: trump && opponents.some((o) => !voids[o].has(trump)) ? trumpsOut : 0,
     partners,
     opponents,
     bidding: state.bidderSeat !== null && state.teams[state.bidderSeat] === myTeam,
@@ -219,7 +223,10 @@ export function botBid(state: HandState, seat: number, rng: Rng): BidAction {
 
 /**
  * Which cards to lay back into the Kitty: never trump or the Rook, keep the
- * 14s and point cards, and empty out short colors so the hand can ruff.
+ * 14s, and empty out short colors so the hand can ruff. The Kitty goes to
+ * whoever takes the last trick, which is usually the bidder's long trumps,
+ * so 5s and 10s are tucked away in it rather than held: in the arena that
+ * was worth five points a hand four-handed (the old rule kept them).
  */
 export function botDiscard(state: HandState, seat: number): CardId[] {
   const { rules } = state
@@ -231,7 +238,7 @@ export function botDiscard(state: HandState, seat: number): CardId[] {
     const suit = suitOf(c)!
     if (suit === keepSuit) return -500 + str(c, rules) // trump last; lowest trump first if forced
     const len = groups[suit].length
-    let p = 50 - str(c, rules) * 2 - pts(c, rules) * 3
+    let p = 50 - str(c, rules) * 2 + pts(c, rules)
     if (str(c, rules) === 14) p -= 20
     if (len <= 2) p += 15
     else if (len === 3) p += 5
@@ -311,31 +318,32 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
     const myTrumps = legal.filter(isTrump)
     const plain = legal.filter((c) => !isTrump(c))
     const topTrump = myTrumps.length ? highest(myTrumps, rules) : null
-    const safeBosses = plain.filter((c) => isBoss(c, k, rules) && !k.opponents.some((o) => k.voids[o].has(suitOf(c)!) && k.trumpsOut > 0))
+    const safeBosses = plain.filter((c) => isBoss(c, k, rules) && !k.opponents.some((o) => k.voids[o].has(suitOf(c)!) && k.oppTrumps > 0))
 
     if (ourMoon) {
       // Every trick is ours or the Moon is gone: boss trumps first while trumps are out, then boss plain cards.
-      if (topTrump && isBoss(topTrump, k, rules) && k.trumpsOut > 0) return topTrump
+      if (topTrump && isBoss(topTrump, k, rules) && k.oppTrumps > 0) return topTrump
       if (safeBosses.length) return juiciest(safeBosses, rules)
       if (topTrump && isBoss(topTrump, k, rules)) return topTrump
       return plain.length ? highest(plain, rules) : highest(myTrumps, rules)
     }
     // The bidding side draws trumps while it holds the boss and opponents may still have some;
     // with a long trump holding it draws from the bottom even without the boss.
-    if (k.bidding && topTrump && k.trumpsOut > 0 && isBoss(topTrump, k, rules) && (myTrumps.length >= 2 || k.trumpsOut <= 2)) return topTrump
-    if (k.bidding && myTrumps.length >= (state.handSize >= 9 ? 5 : 4) && k.trumpsOut >= 2) return lowest(myTrumps, rules)
+    if (k.bidding && topTrump && k.oppTrumps > 0 && isBoss(topTrump, k, rules) && (myTrumps.length >= 2 || k.oppTrumps <= 2)) return topTrump
+    if (k.bidding && myTrumps.length >= (state.handSize >= 9 ? 4 : 3) && k.oppTrumps >= 2) return lowest(myTrumps, rules)
     // Cash a sure winner, points first.
     if (safeBosses.length) return juiciest(safeBosses, rules)
     // Lead into a partner's void so they can ruff, when trumps are still out and no opponent is also void there.
     const ruffSuit = SUITS.find(
-      (su) => su !== trump && k.trumpsOut > 0 && plain.some((c) => suitOf(c) === su) && k.partners.some((p) => k.voids[p].has(su)) && !k.opponents.some((o) => k.voids[o].has(su)),
+      (su) => su !== trump && k.oppTrumps > 0 && plain.some((c) => suitOf(c) === su) && k.partners.some((p) => k.voids[p].has(su) && !k.voids[p].has(trump)) && !k.opponents.some((o) => k.voids[o].has(su)),
     )
     if (ruffSuit) return cheapest(plain.filter((c) => suitOf(c) === ruffSuit), rules)
-    if (topTrump && isBoss(topTrump, k, rules) && (k.trumpsOut > 0 || plain.length === 0)) return topTrump
+    // A boss trump is led to draw trumps only by the bidding side; a defender keeps it for a fat trick.
+    if (topTrump && isBoss(topTrump, k, rules) && ((k.oppTrumps > 0 && k.bidding) || plain.length === 0)) return topTrump
     if (plain.length) {
       const groups = bySuit(plain)
       // Prefer colors no opponent is known to be void in (a ruff would cost us the trick).
-      const candidates = SUITS.filter((su) => groups[su].length > 0 && !(k.trumpsOut > 0 && k.opponents.some((o) => k.voids[o].has(su))))
+      const candidates = SUITS.filter((su) => groups[su].length > 0 && !(k.oppTrumps > 0 && k.opponents.some((o) => k.voids[o].has(su))))
       const suits = (candidates.length ? candidates : SUITS.filter((su) => groups[su].length > 0)).sort((a, b) =>
         k.bidding ? groups[a].length - groups[b].length : groups[b].length - groups[a].length,
       )
@@ -355,6 +363,8 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
   const winning = legal.filter((c) => winnerIfPlayed(state, seat, c) === seat)
   const safeWinners = winning.filter((c) => last || !opponentCouldBeat(state, k, seat, c))
   const plainLegal = legal.filter((c) => !isTrump(c))
+  // A top trump is a sure trick later; a defender does not spend it on a cheap trick.
+  const saveBoss = (c: CardId) => isTrump(c) && isBoss(c, k, rules)
   const plainOrAll = plainLegal.length ? plainLegal : legal
   const dump = () => {
     // Throw the cheapest card, preferring to empty a short color.
@@ -379,13 +389,18 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
 
   // An opponent is winning (or led). Can I take it?
   if (winning.length) {
-    if (last) return juiciest(winning, rules)
+    // Last to play: take it with the fattest winner, but keep the Rook (a trick on its own) when anything else wins.
+    if (last) {
+      const notRook = winning.filter((c) => c !== ROOK)
+      return juiciest(notRook.length ? notRook : winning, rules)
+    }
     if (theirMoon) return lowest(winning, rules) // any trick we take ends their Moon
     if (!partnerToCome) {
       // I am my side's last chance: take it with the smallest sure winner; fight for a fat trick.
       if (safeWinners.length) {
         const w = lowest(safeWinners, rules)
         if (trickPoints === 0 && !k.bidding && !ourMoon && str(w, rules) >= 13 && !isBoss(w, k, rules)) return dump()
+        if (saveBoss(w) && trickPoints < 10 && !k.bidding) return dump()
         return w
       }
       if (trickPoints >= 10 || ourMoon || (k.bidding && rng() < 0.6)) return lowest(winning, rules)
@@ -396,6 +411,7 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
     if (safeWinners.length) {
       const w = lowest(safeWinners, rules)
       if (trickPoints === 0 && !k.bidding && !ourMoon && str(w, rules) >= 13 && !isBoss(w, k, rules)) return dump()
+      if (saveBoss(w) && trickPoints < 10 && !k.bidding) return dump()
       return w
     }
     if (ourMoon) return lowest(winning, rules)
