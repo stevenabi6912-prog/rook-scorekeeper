@@ -128,7 +128,7 @@ export function TablePage() {
     () =>
       (match?.seats ?? []).map((s) => {
         const p = byId.get(s.playerId)
-        return { name: p?.name ?? 'Player', emoji: p?.emoji, color: playerColor(p ?? { name: s.playerId }), team: s.team }
+        return { name: p?.name ?? 'Player', emoji: p?.emoji, photo: p?.photo, color: playerColor(p ?? { name: s.playerId }), team: s.team }
       }),
     [match, byId],
   )

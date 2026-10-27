@@ -5,8 +5,9 @@ import { InviteButton } from '../../components/InviteButton'
 import { TopBar } from '../../components/Layout'
 import { useMatchStore, useStore, useStoreContext } from '../../data/StoreContext'
 import { ROOK } from '../../game/cards'
-import { describeStoreError, useGames, usePlayers } from '../../hooks/useData'
+import { describeStoreError, useGames, usePlans, usePlayers } from '../../hooks/useData'
 import type { Handedness, Player, TeamId } from '../../lib/types'
+import { formatWhen, localTimeZone, relativeWhen, toLocalInputValue } from '../../lib/when'
 import { Card } from '../components/Card'
 import { IdentityPicker } from '../components/IdentityPicker'
 import { loadIdentity, saveIdentity } from '../identity'
@@ -34,6 +35,13 @@ export function PlayLobbyPage() {
   const [identity, setIdentity] = useState<string | null>(() => loadIdentity(familyCode ?? ''))
   const [choosing, setChoosing] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [planning, setPlanning] = useState(false)
+  const { plans, error: plansError } = usePlans()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => matchStore.subscribeMatches(setMatches, (e) => setError(`Could not load the tables. ${describeStoreError(e)}`)), [matchStore])
   const me = identity ? byId.get(identity) : undefined
@@ -44,6 +52,13 @@ export function PlayLobbyPage() {
   const open = useMemo(() => (matches ?? []).filter((m) => m.status === 'seating' || m.status === 'playing'), [matches])
   const gameById = useMemo(() => new Map((games ?? []).map((g) => [g.id, g])), [games])
   const people = useMemo(() => (players ?? []).filter((p) => !p.archived && !p.bot), [players])
+  // Plans stay listed until three hours after their time; this phone's own old ones are tidied away.
+  const upcoming = useMemo(() => (plans ?? []).filter((p) => p.at > now - 3 * 3600_000), [plans, now])
+  useEffect(() => {
+    for (const p of plans ?? []) {
+      if (p.uid === matchStore.uid && p.at < now - 24 * 3600_000) dataStore.deletePlan(p.id).catch(() => undefined)
+    }
+  }, [plans, now, matchStore.uid, dataStore])
 
   const pick = (playerId: string) => {
     saveIdentity(familyCode ?? '', playerId)
@@ -109,6 +124,48 @@ export function PlayLobbyPage() {
         </section>
 
         <section className="section">
+          <h3>Plans</h3>
+          {plansError && <div className="small muted">Plans are not available yet. {plansError}</div>}
+          {!plansError && upcoming.length === 0 && <div className="small muted">Nobody has said when they'll be here.</div>}
+          <div className="list">
+            {upcoming.map((p) => {
+              const who = byId.get(p.playerId)
+              const mine = p.uid === matchStore.uid
+              return (
+                <div key={p.id} className="card row plan" style={{ gap: 10 }}>
+                  <Avatar player={who} />
+                  <div className="grow">
+                    <div><strong>{who?.name ?? 'Someone'}</strong> · {formatWhen(p.at, now)}</div>
+                    {p.note && <div className="small">{p.note}</div>}
+                    <div className="small muted">{relativeWhen(p.at, now)}</div>
+                  </div>
+                  {mine && (
+                    <button type="button" className="icon-btn" aria-label="Remove this plan" onClick={() => dataStore.deletePlan(p.id).catch((e) => setError(describeStoreError(e)))}>✕</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {validIdentity && !plansError && !planning && (
+            <button type="button" className="btn block" style={{ marginTop: 8 }} onClick={() => setPlanning(true)}>🕒 I'll be here at…</button>
+          )}
+          {validIdentity && planning && (
+            <PlanForm
+              onCancel={() => setPlanning(false)}
+              onSave={async (at, note) => {
+                try {
+                  await dataStore.addPlan({ playerId: validIdentity, uid: matchStore.uid, note, at })
+                  setPlanning(false)
+                } catch (e) {
+                  setError(`Could not save the plan. ${describeStoreError(e as Error)}`)
+                }
+              }}
+            />
+          )}
+          <p className="small muted" style={{ marginTop: 6 }}>Times show in each phone's own time zone{localTimeZone() ? ` (yours: ${localTimeZone().replace('_', ' ')})` : ''}.</p>
+        </section>
+
+        <section className="section">
           <h3>Tables</h3>
           {matches === null && <div className="spinner" />}
           {matches !== null && open.length === 0 && <div className="empty">No table is open right now.</div>}
@@ -170,6 +227,46 @@ export function PlayLobbyPage() {
         </section>
       </main>
     </>
+  )
+}
+
+/* ------------------------------------------------------------ plans */
+
+function PlanForm({ onCancel, onSave }: { onCancel: () => void; onSave: (at: number, note: string) => Promise<void> }) {
+  // Default to the next full hour, in this phone's local time.
+  const [when, setWhen] = useState(() => {
+    const d = new Date()
+    d.setMinutes(0, 0, 0)
+    d.setHours(d.getHours() + 1)
+    return toLocalInputValue(d.getTime())
+  })
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const at = new Date(when).getTime()
+  const valid = Number.isFinite(at)
+  return (
+    <form
+      className="card stack"
+      style={{ marginTop: 8 }}
+      onSubmit={async (e) => {
+        e.preventDefault()
+        if (!valid) return
+        setBusy(true)
+        await onSave(at, note.trim().slice(0, 200))
+        setBusy(false)
+      }}
+    >
+      <label className="small muted">
+        I'll be here at
+        <input className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} required style={{ marginTop: 4 }} />
+      </label>
+      <input className="input" placeholder="Note (optional), e.g. “after church”" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} aria-label="Note" />
+      {valid && <div className="small muted">{formatWhen(at)} · {relativeWhen(at)}</div>}
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn grow" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button type="submit" className="btn primary grow" disabled={busy || !valid}>Post</button>
+      </div>
+    </form>
   )
 }
 

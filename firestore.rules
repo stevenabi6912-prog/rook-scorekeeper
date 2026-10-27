@@ -51,6 +51,21 @@ service cloud.firestore {
           && request.resource.data.lastSeen is number;
       }
 
+      // "I'll be here at 6": notes in the Play lobby with a time. Anyone in the
+      // family may leave one; only the phone that left it may remove it.
+      match /plans/{planId} {
+        allow read: if signedIn() && validCode(code);
+        allow create: if signedIn() && validCode(code)
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.playerId is string
+          && request.resource.data.note is string
+          && request.resource.data.note.size() <= 200
+          && request.resource.data.at is number
+          && request.resource.data.createdAt is number;
+        allow update: if false;
+        allow delete: if signedIn() && validCode(code) && resource.data.uid == request.auth.uid;
+      }
+
       // ---------------------------------------------------------------
       // Online play (branch online-play). A match is a table; its public
       // document is readable by the family. Each seat's cards and the Kitty

@@ -7,9 +7,23 @@ export interface Player {
   name: string
   emoji?: string
   color?: string
+  /** Small square JPEG data URL (see lib/photo.ts); shown instead of the emoji. */
+  photo?: string
   archived: boolean
   /** A computer player seated at online tables; hidden from the Players list and stats. */
   bot?: boolean
+  createdAt: number
+}
+
+/** "I'll be here at 6": a note in the Play lobby with a time, shown in each phone's own time zone. */
+export interface Plan {
+  id: string
+  playerId: string
+  /** The phone that left it; only it can remove it. */
+  uid: string
+  note: string
+  /** When, as UTC milliseconds. */
+  at: number
   createdAt: number
 }
 

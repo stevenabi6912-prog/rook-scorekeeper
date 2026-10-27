@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { QUICK_REACTIONS, type ChatMessage, type NewChatMessage } from '../match/types'
-import type { SeatInfo } from './Table'
+import { SeatAvatar, type SeatInfo } from './Table'
 
 /*
  * Table chat: a bottom sheet with the conversation, quick reactions, a text
@@ -104,11 +104,7 @@ function ChatLine({ m, seats, mine }: { m: ChatMessage; seats: SeatInfo[]; mine:
   const info = m.seat !== null ? seats[m.seat] : undefined
   return (
     <div className={`chat-line${mine ? ' mine' : ''}`}>
-      {info && (
-        <span className="seat-avatar" style={{ background: info.color }} aria-hidden>
-          {info.emoji ?? info.name.charAt(0)}
-        </span>
-      )}
+      {info && <SeatAvatar info={info} />}
       <div className="chat-body">
         <div className={`chat-name team-${info?.team ?? 'A'}`}>{info?.name ?? 'Table'}</div>
         {m.kind === 'voice' && m.audio ? <VoiceNote m={m} /> : <div className={`chat-text${m.kind === 'reaction' ? ' reaction' : ''}`}>{m.text}</div>}

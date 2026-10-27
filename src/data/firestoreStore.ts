@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   deleteField,
   doc,
   getDocs,
@@ -14,8 +15,8 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { sortHands } from '../lib/scoring'
-import type { Game, Hand, HandInput, Player } from '../lib/types'
-import { clean, type DataStore, type NewGame, type NewPlayer } from './store'
+import type { Game, Hand, HandInput, Plan, Player } from '../lib/types'
+import { clean, type DataStore, type NewGame, type NewPlan, type NewPlayer } from './store'
 
 const asDoc = <T>(snap: QueryDocumentSnapshot<DocumentData>): T => ({ id: snap.id, ...snap.data() }) as T
 
@@ -28,6 +29,7 @@ export function createFirestoreStore(db: Firestore, familyCode: string): DataSto
   const players = collection(family, 'players')
   const games = collection(family, 'games')
   const hands = (gameId: string) => collection(games, gameId, 'hands')
+  const plans = collection(family, 'plans')
 
   async function nextHandNumber(gameId: string): Promise<number> {
     const snap = await getDocs(hands(gameId))
@@ -41,6 +43,17 @@ export function createFirestoreStore(db: Firestore, familyCode: string): DataSto
 
   return {
     kind: 'firestore',
+
+    subscribePlans(cb, onError) {
+      return onSnapshot(query(plans, orderBy('at', 'asc')), (snap) => cb(snap.docs.map((d) => asDoc<Plan>(d))), onError)
+    },
+    async addPlan(p: NewPlan) {
+      const ref = await addDoc(plans, clean({ ...p, createdAt: Date.now() }))
+      return ref.id
+    },
+    deletePlan(id) {
+      return deleteDoc(doc(plans, id))
+    },
 
     subscribePlayers(cb, onError) {
       return onSnapshot(

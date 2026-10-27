@@ -11,7 +11,7 @@ import type { TeamId } from '../../lib/types'
 import { audioResume, isMuted, setMuted, sounds, unlockAudio } from '../sound'
 import { HandFan } from './Hand'
 import { BidPanel, HandSummary, KittyPanel, OvershootPanel, TrumpChip, TrumpPanel } from './Panels'
-import { SeatBadge, Table, type SeatInfo, type Sweep } from './Table'
+import { SeatAvatar, SeatBadge, Table, type SeatInfo, type Sweep } from './Table'
 import { ChatPanel, type ChatApi } from './ChatPanel'
 import { useWakeLock } from '../wakeLock'
 import '../play.css'
@@ -470,7 +470,7 @@ export function TableView(props: TableViewProps) {
             const info = m.seat !== null ? seats[m.seat] : undefined
             return (
               <div key={m.id} className="chat-pop">
-                <span className="seat-avatar" style={{ background: info?.color }} aria-hidden>{info?.emoji ?? info?.name.charAt(0)}</span>
+                <SeatAvatar info={info} />
                 <div className="chat-pop-body">
                   <div className={`chat-pop-name team-${info?.team ?? 'A'}`}>{info?.name ?? 'Table'}</div>
                   <div className={`chat-pop-text${m.kind === 'reaction' ? ' reaction' : ''}`}>{m.kind === 'voice' ? '🎤 Voice note. Tap to listen.' : m.text}</div>

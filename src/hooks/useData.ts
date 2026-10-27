@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../data/StoreContext'
-import type { Game, Hand, Player } from '../lib/types'
+import type { Game, Hand, Plan, Player } from '../lib/types'
 
 /**
  * Turns raw Firestore errors into something a family member can act on, and
@@ -27,6 +27,14 @@ export function usePlayers() {
   useEffect(() => store.subscribePlayers(setPlayers, (e) => setError(describeStoreError(e))), [store])
   const byId = useMemo(() => new Map((players ?? []).map((p) => [p.id, p])), [players])
   return { players, byId, loading: players === null, error }
+}
+
+export function usePlans() {
+  const store = useStore()
+  const [plans, setPlans] = useState<Plan[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => store.subscribePlans(setPlans, (e) => setError(describeStoreError(e))), [store])
+  return { plans, error }
 }
 
 export function useGames() {

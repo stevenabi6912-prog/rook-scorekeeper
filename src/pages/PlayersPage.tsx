@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Avatar, PLAYER_COLORS, PLAYER_EMOJIS, playerColor } from '../components/Avatar'
+import { PhotoButtons } from '../components/PhotoButtons'
 import { TopBar } from '../components/Layout'
 import { useStore } from '../data/StoreContext'
 import { usePlayers } from '../hooks/useData'
@@ -86,7 +87,7 @@ export function PlayersPage() {
   )
 }
 
-interface FormValues { name: string; emoji?: string; color?: string }
+interface FormValues { name: string; emoji?: string; color?: string; photo?: string }
 
 function PlayerForm({
   initial, onSave, onCancel, onArchive,
@@ -94,6 +95,7 @@ function PlayerForm({
   const [name, setName] = useState(initial?.name ?? '')
   const [emoji, setEmoji] = useState(initial?.emoji ?? '')
   const [color, setColor] = useState(initial?.color ?? '')
+  const [photo, setPhoto] = useState(initial?.photo ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -106,7 +108,8 @@ function PlayerForm({
     }
     setBusy(true)
     try {
-      await onSave({ name: trimmed, emoji: emoji || undefined, color: color || undefined })
+      // An empty photo string clears a photo that was there before.
+      await onSave({ name: trimmed, emoji: emoji || undefined, color: color || undefined, photo })
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -114,7 +117,7 @@ function PlayerForm({
     }
   }
 
-  const preview = { name: name || '?', emoji, color }
+  const preview = { name: name || '?', emoji, color, photo }
   return (
     <form className="card stack" onSubmit={submit}>
       <div className="row">
@@ -122,7 +125,11 @@ function PlayerForm({
         <input className="input grow" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} autoFocus aria-label="Player name" />
       </div>
       <div>
-        <div className="muted small" style={{ marginBottom: 6 }}>Emoji (optional)</div>
+        <div className="muted small" style={{ marginBottom: 6 }}>Photo (optional)</div>
+        <PhotoButtons photo={photo} onChange={setPhoto} onError={setErr} />
+      </div>
+      <div>
+        <div className="muted small" style={{ marginBottom: 6 }}>Emoji (optional, shown when there is no photo)</div>
         <div className="chips">
           <button type="button" className={`chip${emoji === '' ? ' selected' : ''}`} onClick={() => setEmoji('')}>Aa</button>
           {PLAYER_EMOJIS.map((e) => (

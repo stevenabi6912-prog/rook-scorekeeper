@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Avatar, PLAYER_COLORS, PLAYER_EMOJIS } from '../../components/Avatar'
+import { PhotoButtons } from '../../components/PhotoButtons'
 import { useStore } from '../../data/StoreContext'
 import type { Player } from '../../lib/types'
 
@@ -13,6 +14,7 @@ export function IdentityPicker({ players, onPick, onCancel }: { players: Player[
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState<string>(PLAYER_EMOJIS[0])
   const [color, setColor] = useState<string>(PLAYER_COLORS[0])
+  const [photo, setPhoto] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const people = players.filter((p) => !p.archived && !p.bot)
@@ -23,7 +25,7 @@ export function IdentityPicker({ players, onPick, onCancel }: { players: Player[
     if (!n) return
     setBusy(true)
     try {
-      const id = await store.addPlayer({ name: n, emoji, color })
+      const id = await store.addPlayer({ name: n, emoji, color, ...(photo ? { photo } : {}) })
       onPick(id)
     } catch (err) {
       setError((err as Error).message)
@@ -55,7 +57,11 @@ export function IdentityPicker({ players, onPick, onCancel }: { players: Player[
       )}
       {adding && (
         <form className="stack" onSubmit={add}>
-          <input className="input" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus aria-label="Your name" />
+          <div className="row">
+            <Avatar player={{ name: name || '?', emoji, color, photo }} size="lg" />
+            <input className="input grow" placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} autoFocus aria-label="Your name" />
+          </div>
+          <PhotoButtons photo={photo} onChange={setPhoto} onError={setError} />
           <div className="chips">
             {PLAYER_EMOJIS.map((e) => (
               <button key={e} type="button" className={`chip${emoji === e ? ' selected' : ''}`} onClick={() => setEmoji(e)} aria-label={`Emoji ${e}`}>{e}</button>

@@ -11,12 +11,12 @@ export function playerColor(p: Pick<Player, 'color' | 'name'> | undefined): stri
   return PLAYER_COLORS[h % PLAYER_COLORS.length]
 }
 
-export function Avatar({ player, size }: { player?: Pick<Player, 'name' | 'emoji' | 'color'>; size?: 'sm' | 'lg' }) {
+export function Avatar({ player, size }: { player?: Pick<Player, 'name' | 'emoji' | 'color' | 'photo'>; size?: 'sm' | 'lg' }) {
   const cls = `avatar${size ? ` ${size}` : ''}`
   if (!player) return <span className={cls}>?</span>
   return (
     <span className={cls} style={{ background: playerColor(player) }} aria-hidden>
-      {player.emoji || player.name.trim().charAt(0).toUpperCase() || '?'}
+      {player.photo ? <img src={player.photo} alt="" /> : player.emoji || player.name.trim().charAt(0).toUpperCase() || '?'}
     </span>
   )
 }

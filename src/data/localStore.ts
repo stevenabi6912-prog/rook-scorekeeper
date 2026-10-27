@@ -1,11 +1,12 @@
 import { sortHands } from '../lib/scoring'
-import type { Game, Hand, HandInput, Player } from '../lib/types'
-import { clean, type DataStore, type NewGame, type NewPlayer } from './store'
+import type { Game, Hand, HandInput, Plan, Player } from '../lib/types'
+import { clean, type DataStore, type NewGame, type NewPlan, type NewPlayer } from './store'
 
 interface LocalData {
   players: Player[]
   games: Game[]
   hands: Record<string, Hand[]>
+  plans?: Plan[]
 }
 
 /**
@@ -41,6 +42,19 @@ export function createLocalStore(familyCode: string): DataStore {
 
   return {
     kind: 'local',
+    subscribePlans(cb) {
+      return listen(() => cb([...(data.plans ?? [])].sort((a, b) => a.at - b.at)))
+    },
+    async addPlan(p: NewPlan) {
+      const plan: Plan = clean({ ...p, id: id(), createdAt: Date.now() })
+      data = { ...data, plans: [...(data.plans ?? []), plan] }
+      save()
+      return plan.id
+    },
+    async deletePlan(pid) {
+      data = { ...data, plans: (data.plans ?? []).filter((p) => p.id !== pid) }
+      save()
+    },
     subscribePlayers(cb) {
       return listen(() => cb([...data.players].sort((a, b) => a.createdAt - b.createdAt)))
     },

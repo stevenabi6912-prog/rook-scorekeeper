@@ -53,6 +53,17 @@ export function GamePage() {
     await store.updateGame(game.id, { status: 'finished', winner, finishedAt: Date.now() })
   }
   const reopen = () => store.updateGame(game.id, { status: 'active', winner: null })
+  // Same teams and seats; the deal carries on from where this game left off.
+  const playAgain = async () => {
+    const id = await store.createGame({
+      handedness: game.handedness,
+      teams: game.teams,
+      seatOrder: game.seatOrder,
+      firstDealerId: dealerId,
+      mode: game.mode ?? 'inPerson',
+    })
+    navigate(`/game/${id}`)
+  }
 
   return (
     <>
@@ -75,6 +86,11 @@ export function GamePage() {
             <div className="small" style={{ marginTop: 4 }}>
               Finished {game.finishedAt ? new Date(game.finishedAt).toLocaleString() : ''}
             </div>
+            {game.mode !== 'online' && (
+              <button className="btn primary block" style={{ marginTop: 10 }} onClick={playAgain}>
+                🔁 Play again · same teams, {dealer?.name ?? 'next player'} deals
+              </button>
+            )}
           </div>
         )}
         {isActive && atTarget.length > 0 && (

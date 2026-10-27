@@ -1,9 +1,10 @@
-import type { Game, Hand, HandInput, Player } from '../lib/types'
+import type { Game, Hand, HandInput, Plan, Player } from '../lib/types'
 
 export type Unsubscribe = () => void
 
 export type NewPlayer = Omit<Player, 'id' | 'createdAt' | 'archived'>
 export type NewGame = Omit<Game, 'id' | 'createdAt' | 'status'>
+export type NewPlan = Omit<Plan, 'id' | 'createdAt'>
 
 /**
  * Everything the UI needs from the database. Implemented by Firestore for the
@@ -29,6 +30,10 @@ export interface DataStore {
   updateHand(gameId: string, handId: string, patch: Partial<HandInput>): Promise<void>
   /** Deletes the hand and renumbers the hands after it. */
   deleteHand(gameId: string, handId: string): Promise<void>
+
+  subscribePlans(cb: (plans: Plan[]) => void, onError?: (e: Error) => void): Unsubscribe
+  addPlan(p: NewPlan): Promise<string>
+  deletePlan(id: string): Promise<void>
 }
 
 /** Strips undefined values, which Firestore rejects. */

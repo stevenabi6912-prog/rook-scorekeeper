@@ -7,8 +7,19 @@ import { CARD_INK, Card, CardStack, cardLabel } from './Card'
 export interface SeatInfo {
   name: string
   emoji?: string
+  /** Small JPEG data URL from the player's profile. */
+  photo?: string
   color: string
   team: TeamId
+}
+
+/** The round avatar used on seat badges, chat lines and chat pop-ups. */
+export function SeatAvatar({ info, className }: { info?: SeatInfo; className?: string }) {
+  return (
+    <span className={`seat-avatar${className ? ` ${className}` : ''}`} style={{ background: info?.color }} aria-hidden>
+      {info?.photo ? <img src={info.photo} alt="" /> : info?.emoji ?? info?.name.charAt(0).toUpperCase() ?? '?'}
+    </span>
+  )
 }
 
 export interface Sweep {
@@ -179,9 +190,7 @@ export function Table({ state, me, seats, bubbles, sweep, reveal }: TableProps) 
 export function SeatBadge({ info, dealer, bidder, turn, size }: { info: SeatInfo; dealer?: boolean; bidder?: boolean; turn?: boolean; size?: 'lg' }) {
   return (
     <div className={`seat-badge team-${info.team}${turn ? ' turn' : ''}${size ? ` ${size}` : ''}`}>
-      <span className="seat-avatar" style={{ background: info.color }} aria-hidden>
-        {info.emoji ?? info.name.charAt(0).toUpperCase()}
-      </span>
+      <SeatAvatar info={info} />
       <span className="seat-name">{info.name}</span>
       {dealer && <span className="seat-tag dealer" title="Dealer">D</span>}
       {bidder && <span className="seat-tag bidder" title="Bidder">★</span>}
