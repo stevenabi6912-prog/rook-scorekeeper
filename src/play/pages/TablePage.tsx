@@ -16,6 +16,7 @@ import { TableView, type Finished } from '../components/TableView'
 import { scorekeeperHandNumber, useHostDuties } from '../match/host'
 import { claimHost, claimSeat, commitMove, dealNextHand, mySeats, releaseSeat, seatBots, seatsFilled, setMatchStatus } from '../match/moves'
 import { loadIdentity } from '../identity'
+import { autoTeamName } from '../../lib/seating'
 import { useHeartbeat, useWhoIsHere } from '../presence'
 import { useWakeLock } from '../wakeLock'
 import { PRESENCE_STALE_MS } from '../match/types'
@@ -157,7 +158,21 @@ export function TablePage() {
         byId={byId}
         isHost={isHost}
         uid={matchStore.uid}
-        onClaim={(seat) => claimSeat(matchStore, match.id, seat).catch((e) => setError(`Could not take that seat. ${describeStoreError(e)}`))}
+        onClaim={(seat) =>
+          claimSeat(matchStore, match.id, seat, identity ?? undefined)
+            .then((replacedBot) => {
+              // The seat is now this person by name: swap the bot out of the scorekeeper's teams too.
+              if (!replacedBot || !identity || !game) return
+              const swap = (ids: string[]) => ids.map((id) => (id === replacedBot ? identity : id))
+              const nameOf = (id: string) => (byId.get(id)?.name ?? 'Player').replace(' 🤖', '')
+              const teams = {
+                A: { ...game.teams.A, playerIds: swap(game.teams.A.playerIds), name: autoTeamName(swap(game.teams.A.playerIds).map(nameOf)) },
+                B: { ...game.teams.B, playerIds: swap(game.teams.B.playerIds), name: autoTeamName(swap(game.teams.B.playerIds).map(nameOf)) },
+              }
+              return dataStore.updateGame(game.id, { seatOrder: swap(game.seatOrder), teams })
+            })
+            .catch((e) => setError(`Could not take that seat. ${describeStoreError(e)}`))
+        }
         onRelease={(seat) => releaseSeat(matchStore, match.id, seat).catch((e) => setError(`Could not free that seat. ${describeStoreError(e)}`))}
         onBots={(seat) => seatBots(matchStore, match.id, seat).catch((e) => setError(`Could not seat a bot. ${describeStoreError(e)}`))}
         onStart={() => dealNextHand(matchStore, match.id).catch((e) => setError(`Could not deal. ${describeStoreError(e)}`))}

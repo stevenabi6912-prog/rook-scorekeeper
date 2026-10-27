@@ -71,13 +71,22 @@ export async function dealNextHand(store: MatchStore, matchId: string): Promise<
 }
 
 /** Claim an empty seat for this phone. */
-export async function claimSeat(store: MatchStore, matchId: string, seat: number): Promise<void> {
-  await store.transact(matchId, async (tx) => {
+/**
+ * Take a seat. When a person takes over a bot's seat and they are not already
+ * seated at this table under their own name, the seat becomes theirs by name
+ * too, so the table and the scorekeeper stop crediting the bot. Returns the
+ * bot's player id when that happened, so the game's teams can be updated.
+ */
+export async function claimSeat(store: MatchStore, matchId: string, seat: number, asPlayerId?: string): Promise<string | null> {
+  return store.transact(matchId, async (tx) => {
     const match = await tx.getMatch()
     const s = match.seats[seat]
     if (!s) throw new Error('No such seat.')
     if (s.uid && s.uid !== store.uid) throw new Error('Someone already has that seat.')
-    tx.setMatch({ seats: updateSeat(match.seats, seat, { uid: store.uid, bot: false }) })
+    const alreadyHere = !!asPlayerId && match.seats.some((x, i) => i !== seat && x.playerId === asPlayerId)
+    const rename = !!asPlayerId && s.bot && s.playerId !== asPlayerId && !alreadyHere
+    tx.setMatch({ seats: updateSeat(match.seats, seat, { uid: store.uid, bot: false, ...(rename ? { playerId: asPlayerId } : {}) }) })
+    return rename ? s.playerId : null
   })
 }
 
