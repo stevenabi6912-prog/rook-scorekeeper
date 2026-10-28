@@ -72,6 +72,21 @@ describe('bots', () => {
     expect(choice).toEqual({ type: 'play', seat: 0, card: 'Y6' })
   })
 
+  it('do not play the 14 of trump into a trick while the Rook is still out', () => {
+    // Trump is green; seat 1 (an opponent, still to play) holds the Rook. Seat 3 leads the
+    // green 10 and seat 0 must follow trump: the 7 goes, the 14 stays home.
+    let s = startHandFromDeal(
+      { rules: FAMILY_RULES, handedness: 4, teams: TEAMS4, dealerSeat: 2 },
+      { hands: [['G14', 'G7', 'R6'], [ROOK, 'R8', 'Y9'], ['B6', 'R9', 'Y7'], ['G10', 'Y8', 'R10']], nest: [] },
+    )
+    for (const a of [{ type: 'bid', seat: 3, bid: 70 }, { type: 'bid', seat: 0, bid: 'pass' }, { type: 'bid', seat: 1, bid: 'pass' }, { type: 'bid', seat: 2, bid: 'pass' }, { type: 'trump', seat: 3, trump: 'green' }, { type: 'play', seat: 3, card: 'G10' }] as const) {
+      const r = applyAction(s, a)
+      if (!r.ok) throw new Error(r.error)
+      s = r.state
+    }
+    expect(botDecision(s, 0, seededRng('r'))).toEqual({ type: 'play', seat: 0, card: 'G7' })
+  })
+
   it('never lay trump, the Rook or a 14 into the Kitty when they have a choice', () => {
     let s = startHandFromDeal(
       { rules: FAMILY_RULES, handedness: 4, teams: TEAMS4, dealerSeat: 3 },

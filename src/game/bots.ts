@@ -372,6 +372,10 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
   const plainLegal = legal.filter((c) => !isTrump(c))
   // A top trump is a sure trick later; a defender does not spend it on a cheap trick.
   const saveBoss = (c: CardId) => isTrump(c) && isBoss(c, k, rules)
+  // A high trump that is not yet the boss (the Rook, or a higher trump, is still out) is never
+  // spent where an opponent still to play could take it: that is how a 14 of trump gets eaten.
+  const exposed = (c: CardId) => isTrump(c) && str(c, rules) >= 13 && !isBoss(c, k, rules) && !last && opponentCouldBeat(state, k, seat, c)
+  const fightable = winning.filter((c) => !exposed(c))
   const plainOrAll = plainLegal.length ? plainLegal : legal
   const dump = () => {
     // Throw the cheapest card, preferring to empty a short color.
@@ -401,7 +405,7 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
       const notRook = winning.filter((c) => c !== ROOK)
       return juiciest(notRook.length ? notRook : winning, rules)
     }
-    if (theirMoon) return lowest(winning, rules) // any trick we take ends their Moon
+    if (theirMoon) return lowest(fightable.length ? fightable : winning, rules) // any trick we take ends their Moon
     if (!partnerToCome) {
       // I am my side's last chance: take it with the smallest sure winner; fight for a fat trick.
       if (safeWinners.length) {
@@ -410,7 +414,8 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
         if (saveBoss(w) && trickPoints < 10 && !k.bidding) return dump()
         return w
       }
-      if (trickPoints >= 10 || ourMoon || (k.bidding && rng() < 0.6)) return lowest(winning, rules)
+      if (ourMoon) return lowest(fightable.length ? fightable : winning, rules)
+      if ((trickPoints >= 10 || (k.bidding && rng() < 0.6)) && fightable.length) return lowest(fightable, rules)
       return dump()
     }
     // Partner still to play: a sure cheap winner is still worth taking (points are
@@ -421,8 +426,8 @@ export function botPlay(state: HandState, seat: number, rng: Rng): CardId {
       if (saveBoss(w) && trickPoints < 10 && !k.bidding) return dump()
       return w
     }
-    if (ourMoon) return lowest(winning, rules)
-    if (trickPoints >= 10) return lowest(winning, rules)
+    if (ourMoon) return lowest(fightable.length ? fightable : winning, rules)
+    if (trickPoints >= 10 && fightable.length) return lowest(fightable, rules)
     return dump()
   }
 
