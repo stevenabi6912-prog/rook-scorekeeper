@@ -32,15 +32,18 @@ export function HandFan({ cards, trump, legal, selected, onSelect, disabled }: H
 
   const sorted = sortHand(cards, trump, FAMILY_RULES)
   const n = sorted.length
+  // A margin either side, so the end cards (which rotate outward) stay on screen.
+  const inset = 10
+  const usable = width - inset * 2
   // Smaller cards when holding the Kitty too (14 cards), so every card keeps a tappable strip.
-  const cardW = Math.min(96, Math.max(56, Math.floor(width / (n > 10 ? 5.4 : 4.2))))
-  const step = n > 1 ? Math.min(cardW * 0.72, (width - cardW - 8) / (n - 1)) : 0
+  const cardW = Math.min(96, Math.max(56, Math.floor(usable / (n > 10 ? 5.4 : 4.2))))
+  const step = n > 1 ? Math.min(cardW * 0.72, (usable - cardW) / (n - 1)) : 0
   const total = cardW + step * (n - 1)
-  const left0 = (width - total) / 2
+  const left0 = inset + (usable - total) / 2
   const legalSet = new Set(legal)
 
   return (
-    <div className={`hand-fan${disabled ? ' disabled' : ''}`} ref={ref} style={{ height: Math.round(cardW * 1.556) + 30 }}>
+    <div className={`hand-fan${disabled ? ' disabled' : ''}`} ref={ref} style={{ height: Math.round(cardW * 1.556) + 38 }}>
       {sorted.map((id, i) => {
         const mid = (n - 1) / 2
         const rot = n > 1 ? (i - mid) * Math.min(3, 24 / n) : 0
@@ -54,7 +57,7 @@ export function HandFan({ cards, trump, legal, selected, onSelect, disabled }: H
             className={`hand-slot${isSelected ? ' selected' : ''}${isTrump ? ' trump' : ''}`}
             style={{
               left: left0 + i * step,
-              top: 14 + lift,
+              top: 24 + lift,
               // Chosen cards lift but keep their place in the fan, so neighbours stay visible.
               zIndex: i,
               transform: `rotate(${rot}deg)`,

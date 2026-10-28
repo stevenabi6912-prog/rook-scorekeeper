@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
+import { applyTheme, loadTheme } from './lib/theme'
+
+// Before the first paint, so a phone on the light theme never flashes dark.
+applyTheme(loadTheme())
 
 // A phone that stays on one screen all evening never navigates, so it would
 // never notice a new build. Ask the service worker to check every five

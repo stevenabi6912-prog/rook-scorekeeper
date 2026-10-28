@@ -11,7 +11,7 @@ import { formatWhen, localTimeZone, relativeWhen, toLocalInputValue } from '../.
 import { Card } from '../components/Card'
 import { IdentityPicker } from '../components/IdentityPicker'
 import { loadIdentity, saveIdentity } from '../identity'
-import { startTable, type Participant } from '../match/lobby'
+import { BOT_NAMES, startTable, type Participant } from '../match/lobby'
 import type { MatchDoc } from '../match/types'
 import { useHeartbeat, useWhoIsHere } from '../presence'
 import { isIdle, useIdleSweep } from '../sweep'
@@ -310,7 +310,7 @@ function StartTable({
     teams[team].push(p)
   })
   const balanced = teams.A.length === limit / 2 && teams.B.length === limit / 2
-  const label = (p: Participant) => (p.kind === 'player' ? people.find((x) => x.id === p.playerId)?.name ?? '?' : `Bot ${p.index + 1} 🤖`)
+  const label = (p: Participant) => (p.kind === 'player' ? people.find((x) => x.id === p.playerId)?.name ?? '?' : `${BOT_NAMES[p.index % BOT_NAMES.length]} 🤖`)
   const flip = (key: string) =>
     setSwap((s) => {
       const n = new Set(s)

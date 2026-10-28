@@ -8,13 +8,6 @@
   --felt-muted: rgba(242, 247, 243, 0.7);
   --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), 0 8px 18px rgba(0, 0, 0, 0.25);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --felt: #1a5a36;
-    --felt-deep: #0b3620;
-  }
-}
-
 /* Cards */
 .rook-card {
   display: block;
@@ -54,7 +47,7 @@
 }
 .table-top .icon-btn.light { color: var(--felt-text); }
 .table-title { flex: 1; min-width: 0; line-height: 1.15; white-space: nowrap; }
-.table-title .hand-no { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--felt-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.table-title .hand-no { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--felt-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .table-title .scores { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .scores .score-sep { margin: 0 6px; color: var(--felt-muted); }
 .score.team-A { color: #9ec5ff; }
@@ -176,7 +169,7 @@
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 10px rgba(255, 213, 74, 0.45); } 50% { box-shadow: 0 0 20px rgba(255, 213, 74, 0.85); } }
 
 .turn-clock {
-  display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px;
+  display: inline-block; margin-left: 8px; white-space: nowrap; padding: 1px 8px; border-radius: 999px;
   background: rgba(255, 255, 255, 0.14); font-variant-numeric: tabular-nums; font-size: 0.8rem; font-weight: 600;
 }
 .turn-clock.urgent { background: #c62828; color: #fff; animation: pulse-red 0.8s ease-in-out infinite; }
@@ -198,7 +191,7 @@
   background: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent);
 }
 .my-row { display: flex; align-items: center; gap: 10px; padding: 0 6px; min-height: 44px; }
-.my-status { flex: 1; font-weight: 600; font-size: 0.92rem; }
+.my-status { flex: 1; min-width: 0; font-weight: 600; font-size: 0.92rem; line-height: 1.2; }
 .my-notice { font-weight: 600; font-size: 0.8rem; color: var(--felt-muted); margin-top: 2px; }
 .claim-btn { min-height: 40px; padding: 6px 14px; background: #fff; border-color: #fff; color: #0f4527; font-weight: 800; animation: pop 0.25s ease-out; }
 .play-btn { min-height: 40px; padding: 6px 18px; background: #ffd54a; border-color: #ffd54a; color: #3a2a00; font-weight: 800; }
@@ -222,7 +215,7 @@
 
 .hand-fan { position: relative; width: 100%; }
 .hand-slot { position: absolute; transition: top 0.18s ease, transform 0.18s ease; transform-origin: 50% 110%; }
-.hand-slot.selected { top: -10px !important; }
+.hand-slot.selected { top: 4px !important; }
 .hand-slot.selected .rook-card { box-shadow: var(--card-shadow), 0 0 0 2px #ffd54a; }
 .hand-fan.disabled .hand-slot { filter: brightness(0.92); }
 

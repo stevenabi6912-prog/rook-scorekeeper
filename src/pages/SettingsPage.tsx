@@ -3,10 +3,12 @@ import { Dialog } from '../components/Dialog'
 import { InviteButton } from '../components/InviteButton'
 import { TopBar } from '../components/Layout'
 import { useStoreContext } from '../data/StoreContext'
+import { THEME_LABELS, useTheme, type Theme } from '../lib/theme'
 
 export function SettingsPage() {
   const { familyCode, demoMode, firebaseConfigured, leave } = useStoreContext()
   const [confirm, setConfirm] = useState(false)
+  const [theme, setTheme] = useTheme()
   return (
     <>
       <TopBar title="Settings" back="/" />
@@ -27,6 +29,17 @@ export function SettingsPage() {
             </div>
           )}
           <button className="btn block" onClick={() => setConfirm(true)}>Switch family passcode</button>
+        </div>
+        <div className="card">
+          <h3>Appearance</h3>
+          <div className="seg" role="radiogroup" aria-label="Appearance">
+            {(['light', 'dark', 'auto'] as Theme[]).map((t) => (
+              <button key={t} type="button" role="radio" aria-checked={theme === t} className={theme === t ? 'active' : ''} onClick={() => setTheme(t)}>
+                {THEME_LABELS[t]}
+              </button>
+            ))}
+          </div>
+          <p className="muted small" style={{ margin: '10px 0 0' }}>Auto follows the phone's own light or dark setting. The card table is always green.</p>
         </div>
         <div className="card">
           <h3>Rules (fixed)</h3>

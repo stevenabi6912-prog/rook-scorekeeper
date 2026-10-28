@@ -38,6 +38,9 @@ interface TableProps {
   reveal: { hands: Record<number, CardId[]>; claimer: number } | null
 }
 
+/** The far seat (badge plus card stack, centred) never sits closer than this to the top of the table area. */
+const FAR_SEAT_MIN_TOP = 58
+
 /** Where seat `k` (relative to me, clockwise) sits, as a fraction of the table. */
 export function seatPosition(k: number, n: number): { x: number; y: number } {
   const angle = Math.PI / 2 + (k * 2 * Math.PI) / n
@@ -78,7 +81,8 @@ export function Table({ state, me, seats, bubbles, sweep, reveal }: TableProps) 
   const n = state.handedness
   const rel = (seat: number) => (seat - me + n) % n
   const { ref, size } = useSize()
-  const cardW = Math.max(54, Math.min(84, Math.floor(size.w / 5)))
+  // Trick cards: a touch smaller on a phone so they clear the side seats.
+  const cardW = Math.max(50, Math.min(84, Math.floor(size.w / 5.6)))
   const exposed = exposedNestCard(state)
 
   // Same keys whether the trick is live or being swept, so the cards already
@@ -99,11 +103,13 @@ export function Table({ state, me, seats, bubbles, sweep, reveal }: TableProps) 
         if (k === 0) return null
         const pos = seatPosition(k, n)
         const isTurn = state.turnSeat === seat && state.phase !== 'over'
+        // The far seat keeps clear of the top bar when a tall panel squeezes the table.
+        const top = Math.max(pos.y * size.h, FAR_SEAT_MIN_TOP)
         return (
           <div
             key={seat}
             className={`seat-spot k${k} n${n}${isTurn ? ' turn' : ''}`}
-            style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
+            style={{ left: `${pos.x * 100}%`, top: `${top}px` }}
           >
             <SeatBadge info={info} dealer={state.dealerSeat === seat} bidder={state.bidderSeat === seat} turn={isTurn} />
             <CardStack count={state.hands[seat].length} width={Math.round(cardW * 0.42)} />

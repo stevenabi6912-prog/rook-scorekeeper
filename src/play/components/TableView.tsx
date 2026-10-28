@@ -520,7 +520,7 @@ function statusText(state: HandState, myTurn: boolean, busy: boolean, selected: 
       return myTurn ? 'Name trump' : `${who} is picking trump…`
     case 'playing': {
       if (!myTurn) return `${who} is thinking…`
-      if (selected.length) return 'Tap again or press Play'
+      if (selected.length) return 'Tap again to play'
       if (canClaimRest(state, me)) return 'Nobody can beat you now'
       const lead = state.trick.plays[0]
       if (!lead) return 'Your lead'

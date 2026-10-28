@@ -99,7 +99,7 @@ export function GamePage() {
             <strong>Game over.</strong>{' '}
             {game.winner ? <>Winner: <strong>{game.teams[game.winner].name}</strong> 🏆</> : 'No winner recorded.'}
             <div className="small" style={{ marginTop: 4 }}>
-              Finished {game.finishedAt ? new Date(game.finishedAt).toLocaleString() : ''}
+              {game.finishedAt ? `Finished ${finishedOn(game.finishedAt)}` : ''}
             </div>
             {game.mode !== 'online' && (
               <button className="btn primary block" style={{ marginTop: 10 }} onClick={playAgain}>
@@ -125,7 +125,7 @@ export function GamePage() {
         {isActive && (
           <>
             <div onClick={() => setOverrideOpen(true)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOverrideOpen(true)}>
-              <DealerCard dealer={dealer} label={`Dealer for hand ${scored.length + 1} · tap to change`} />
+              <DealerCard dealer={dealer} label={`Dealer · hand ${scored.length + 1}`} hint="Change" />
             </div>
             <div className="trump-card" style={{ display: 'block' }}>
               <div className="row">
@@ -148,10 +148,17 @@ export function GamePage() {
                 ))}
               </div>
               <div className="muted small" style={{ margin: '8px 0 4px' }}>For how much</div>
-              <div className="chips">
+              <div className="chips grid-6">
                 {([...BID_OPTIONS, 'moon'] as Bid[]).map((b) => (
-                  <button key={String(b)} type="button" className={`chip${game.currentBid?.bid === b ? ' selected' : ''}`} disabled={!game.currentBid} onClick={() => game.currentBid && store.updateGame(game.id, { currentBid: { bidderId: game.currentBid.bidderId, bid: b } })}>
-                    {b === 'moon' ? '🌙' : b}
+                  <button
+                    key={String(b)}
+                    type="button"
+                    className={`chip compact${game.currentBid?.bid === b ? ' selected' : ''}`}
+                    style={b === 'moon' ? { gridColumn: 'span 2' } : undefined}
+                    disabled={!game.currentBid}
+                    onClick={() => game.currentBid && store.updateGame(game.id, { currentBid: { bidderId: game.currentBid.bidderId, bid: b } })}
+                  >
+                    {b === 'moon' ? '🌙 Moon' : b}
                   </button>
                 ))}
               </div>
@@ -308,4 +315,9 @@ function useLiveTable(gameId: string | undefined): MatchDoc | null {
     )
   }, [matchStore, gameId])
   return table
+}
+
+/** "Oct 27, 8:22 PM" in the phone's own locale. */
+function finishedOn(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }

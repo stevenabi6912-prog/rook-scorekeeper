@@ -69,24 +69,29 @@ function GameCard({ game, hands, byId, onClick }: { game: Game; hands: Hand[] | 
   const names = (ids: string[]) => ids.map((id) => byId.get(id)?.name ?? '?').join(', ')
   const date = new Date(game.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   return (
-    <div className="card tappable" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
-      <div className="row between">
+    <div className="card tappable game-card" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
+      <div className="game-card-head">
         <span className="muted small">{date} · {game.handedness}-handed{summary ? ` · ${summary.handCount} hand${summary.handCount === 1 ? '' : 's'}` : ''}</span>
-        <span className="row" style={{ gap: 4 }}>
+        <span className="game-card-badges">
           {game.mode === 'online' && <span className="badge neutral">Online</span>}
-          {game.status === 'finished' && game.winner && <span className={`badge team-${game.winner}`}>Winner: {game.teams[game.winner].name}</span>}
-          {game.status === 'active' && <span className="badge good">Live</span>}
+          {game.status === 'active' ? <span className="badge good">Live</span> : <span className="badge neutral">Final</span>}
         </span>
       </div>
-      {(['A', 'B'] as const).map((t) => (
-        <div key={t} className="row between" style={{ marginTop: 8 }}>
-          <div className="grow">
-            <div className="truncate"><span className={`badge team-${t}`}>{t}</span> <strong>{game.teams[t].name}</strong></div>
-            <div className="muted small truncate">{names(game.teams[t].playerIds)}</div>
+      {(['A', 'B'] as const).map((t) => {
+        const won = game.status === 'finished' && game.winner === t
+        return (
+          <div key={t} className={`game-card-team${won ? ' won' : ''}`}>
+            <div className="grow">
+              <div className="truncate">
+                <span className={`badge team-${t}`}>{t}</span> <strong>{game.teams[t].name}</strong>
+                {won && <span className="trophy" role="img" aria-label="Winner">🏆</span>}
+              </div>
+              <div className="muted small truncate">{names(game.teams[t].playerIds)}</div>
+            </div>
+            <div className="game-card-total">{summary ? summary.totals[t] : '…'}</div>
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{summary ? summary.totals[t] : '…'}</div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

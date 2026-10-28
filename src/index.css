@@ -7,6 +7,8 @@
   --border: #d5dce4;
   --primary: #1b3a5c;
   --primary-text: #ffffff;
+  --bar-bg: #1b3a5c;
+  --bar-text: #ffffff;
   --accent: #c8102e;
   --good: #1f8a4c;
   --good-bg: #e2f5ea;
@@ -20,15 +22,16 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 14px rgba(0, 0, 0, 0.05);
   --tap: 48px;
   --nav-h: 64px;
-  color-scheme: light dark;
+  color-scheme: light;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 17px;
   line-height: 1.35;
   -webkit-text-size-adjust: 100%;
 }
 
+/* Dark: when the phone is dark and the app is set to match it, or when dark is chosen outright. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f1c2b;
     --surface: #182838;
     --surface-2: #203446;
@@ -37,6 +40,8 @@
     --border: #2d4256;
     --primary: #4f8ed6;
     --primary-text: #061220;
+    --bar-bg: #122236;
+    --bar-text: #eef3f8;
     --good: #4fc27a;
     --good-bg: #16352a;
     --bad: #ff6b6b;
@@ -46,7 +51,30 @@
     --team-b: #ff9b66;
     --team-b-bg: #4a2a1a;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+    --bg: #0f1c2b;
+    --surface: #182838;
+    --surface-2: #203446;
+    --text: #eef3f8;
+    --muted: #9fb0c1;
+    --border: #2d4256;
+    --primary: #4f8ed6;
+    --primary-text: #061220;
+    --bar-bg: #122236;
+    --bar-text: #eef3f8;
+    --good: #4fc27a;
+    --good-bg: #16352a;
+    --bad: #ff6b6b;
+    --bad-bg: #3c1d22;
+    --team-a: #6aa6ff;
+    --team-a-bg: #1a3350;
+    --team-b: #ff9b66;
+    --team-b-bg: #4a2a1a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -74,7 +102,7 @@ button { cursor: pointer; }
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: 8px;
   padding: calc(env(safe-area-inset-top) + 8px) 12px 8px;
-  background: var(--primary); color: var(--primary-text);
+  background: var(--bar-bg); color: var(--bar-text);
   min-height: 56px;
 }
 .topbar h1 { font-size: 1.15rem; flex: 1; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -95,6 +123,7 @@ button { cursor: pointer; }
 }
 .bottom-nav a .ico { font-size: 1.4rem; line-height: 1; }
 .bottom-nav a.active { color: var(--primary); }
+.bottom-nav a.active .ico { transform: translateY(-1px); }
 
 /* Cards and lists */
 .card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; margin-bottom: 14px; }
@@ -146,6 +175,8 @@ button { cursor: pointer; }
 .chips.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); }
 .chips.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); }
 .chips.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); }
+.chips.grid-6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.chip.compact { min-height: 40px; padding: 6px 4px; font-size: 0.95rem; border-radius: 10px; }
 .chip {
   min-height: var(--tap); padding: 8px 12px; border-radius: 12px;
   border: 2px solid var(--border); background: var(--surface); color: var(--text);
@@ -204,6 +235,7 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .dealer-card { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; margin-bottom: 14px; }
 .dealer-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
 .dealer-card .name { font-size: 1.25rem; font-weight: 700; }
+.dealer-card .hint { margin-left: auto; color: var(--primary); font-weight: 600; font-size: 0.9rem; white-space: nowrap; }
 
 .banner { border-radius: var(--radius); padding: 14px; margin-bottom: 14px; background: var(--good-bg); color: var(--good); border: 1px solid var(--good); }
 .banner strong { font-size: 1.1rem; }
@@ -236,6 +268,14 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .badge.team-A { background: var(--team-a-bg); color: var(--team-a); }
 .badge.team-B { background: var(--team-b-bg); color: var(--team-b); }
 .badge.neutral { background: var(--surface-2); color: var(--muted); }
+
+/* Game cards on the Score tab */
+.game-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.game-card-badges { display: flex; gap: 4px; flex: none; }
+.game-card-team { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.game-card-total { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.game-card-team.won .game-card-total { color: var(--good); }
+.game-card-team .trophy { margin-left: 4px; }
 
 /* Preview */
 .preview { border-radius: var(--radius); padding: 14px; background: var(--surface-2); }

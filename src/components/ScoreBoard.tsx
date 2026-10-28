@@ -26,14 +26,15 @@ export function ScoreBoard({ game, totals, byId }: { game: Game; totals: Scores;
   )
 }
 
-export function DealerCard({ dealer, label = 'Dealer' }: { dealer: Player | undefined; label?: string }) {
+export function DealerCard({ dealer, label = 'Dealer', hint }: { dealer: Player | undefined; label?: string; hint?: string }) {
   return (
     <div className="dealer-card">
       <Avatar player={dealer} size="lg" />
-      <div>
+      <div className="grow" style={{ minWidth: 0 }}>
         <div className="label">{label}</div>
-        <div className="name">{dealer?.name ?? 'Unknown'}</div>
+        <div className="name truncate">{dealer?.name ?? 'Unknown'}</div>
       </div>
+      {hint && <span className="hint">{hint} ›</span>}
     </div>
   )
 }
