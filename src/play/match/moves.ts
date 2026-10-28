@@ -124,6 +124,35 @@ export async function setMatchStatus(store: MatchStore, matchId: string, status:
   })
 }
 
+/** A table with no action for this long is closed by whichever phone notices. */
+export const IDLE_TABLE_MS = 5 * 60_000
+
+/** Close an idle table (any phone may; the rules check the idle time too). */
+export async function abandonIdle(store: MatchStore, matchId: string): Promise<void> {
+  await store.transact(matchId, async (tx) => {
+    const match = await tx.getMatch()
+    if (match.status !== 'seating' && match.status !== 'playing') return
+    if (Date.now() < match.updatedAt + IDLE_TABLE_MS) throw new Error('That table is still active.')
+    tx.setMatch({ status: 'abandoned' })
+  })
+}
+
+/**
+ * One table per phone: give up any seat this phone holds at other open
+ * tables. Mid-game the seat goes to a bot so that table keeps moving.
+ */
+export async function leaveOtherTables(store: MatchStore, matches: MatchDoc[], keepMatchId: string): Promise<void> {
+  for (const m of matches) {
+    if (m.id === keepMatchId || (m.status !== 'seating' && m.status !== 'playing')) continue
+    if (!m.seats.some((s) => s.uid === store.uid)) continue
+    await store.transact(m.id, async (tx) => {
+      const match = await tx.getMatch()
+      const seats = match.seats.map((s) => (s.uid === store.uid ? { ...s, uid: null, bot: match.status === 'playing' } : s))
+      tx.setMatch({ seats })
+    })
+  }
+}
+
 function updateSeat(seats: MatchSeat[], seat: number, patch: Partial<MatchSeat>): MatchSeat[] {
   return seats.map((s, i) => (i === seat ? { ...s, ...patch } : s))
 }

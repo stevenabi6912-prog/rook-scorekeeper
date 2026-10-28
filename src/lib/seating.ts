@@ -64,10 +64,32 @@ export function nextSeat(seatOrder: string[], playerId: string): string {
  * the game's first dealer, and respects any manual override stored on the
  * most recent hand (the next dealer is always the seat after the last dealer).
  */
-export function nextDealerId(game: Pick<Game, 'seatOrder' | 'firstDealerId'>, orderedHands: Hand[]): string {
-  if (orderedHands.length === 0) return game.firstDealerId
+export function nextDealerId(game: Pick<Game, 'seatOrder' | 'firstDealerId' | 'subs'>, orderedHands: Hand[]): string {
+  if (orderedHands.length === 0) return currentSeatOf(game, game.firstDealerId)
   const last = orderedHands[orderedHands.length - 1]
-  return nextSeat(game.seatOrder, last.dealerId)
+  return nextSeat(game.seatOrder, currentSeatOf(game, last.dealerId))
+}
+
+/** The id now sitting in the seat that `playerId` had, following any swaps. */
+export function currentSeatOf(game: Pick<Game, 'subs'>, playerId: string): string {
+  let id = playerId
+  for (let i = 0; i < 20 && game.subs?.[id]; i++) id = game.subs[id]
+  return id
+}
+
+/** Put `newId` in `oldId`'s seat: seat order, team membership, an automatic team name, and the swap record. */
+export function swapPlayer(game: Pick<Game, 'seatOrder' | 'teams' | 'subs'>, oldId: string, newId: string, nameOf: (id: string) => string): Pick<Game, 'seatOrder' | 'teams' | 'subs'> {
+  const swap = (ids: string[]) => ids.map((id) => (id === oldId ? newId : id))
+  const team = (t: Game['teams']['A']) => {
+    const wasAuto = t.name === autoTeamName(t.playerIds.map(nameOf))
+    const playerIds = swap(t.playerIds)
+    return { ...t, playerIds, name: wasAuto ? autoTeamName(playerIds.map(nameOf)) : t.name }
+  }
+  return {
+    seatOrder: swap(game.seatOrder),
+    teams: { A: team(game.teams.A), B: team(game.teams.B) },
+    subs: { ...(game.subs ?? {}), [oldId]: newId },
+  }
 }
 
 /** Automatic team name from player names, e.g. "Steven & Abi". */

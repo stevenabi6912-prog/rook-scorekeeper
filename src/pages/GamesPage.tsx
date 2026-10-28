@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { TopBar } from '../components/Layout'
-import { useStoreContext } from '../data/StoreContext'
+import { useMatchStore, useStoreContext } from '../data/StoreContext'
+import type { MatchDoc } from '../play/match/types'
+import { useIdleSweep } from '../play/sweep'
 import { useAllHands, useGames, usePlayers } from '../hooks/useData'
 import { summarizeGame } from '../lib/stats'
 import type { Game, Hand, Player } from '../lib/types'
@@ -11,6 +14,11 @@ export function GamesPage() {
   const handsByGame = useAllHands(games)
   const { demoMode } = useStoreContext()
   const navigate = useNavigate()
+  // Online games whose table went quiet are finished or removed from here too.
+  const matchStore = useMatchStore()
+  const [matches, setMatches] = useState<MatchDoc[] | null>(null)
+  useEffect(() => matchStore.subscribeMatches(setMatches, () => undefined), [matchStore])
+  useIdleSweep(matches)
 
   const active = (games ?? []).filter((g) => g.status === 'active')
   const past = (games ?? []).filter((g) => g.status === 'finished')

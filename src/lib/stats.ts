@@ -8,7 +8,7 @@ export interface PlayerStats {
   wins: number
   bids: number
   bidsMade: number
-  /** Average of numeric bids (moons excluded). */
+  /** Average bid, with a Moon counted as 120. */
   averageBid: number | null
   moonsAttempted: number
   moonsMade: number
@@ -57,7 +57,8 @@ export function computePlayerStats(
   for (const p of players) get(p.id)
 
   for (const game of games) {
-    const participants = [...game.teams.A.playerIds, ...game.teams.B.playerIds]
+    // Anyone who sat in the game counts as having played it, including people swapped out.
+    const participants = [...new Set([...game.teams.A.playerIds, ...game.teams.B.playerIds, ...Object.keys(game.subs ?? {})])]
     for (const id of participants) {
       const s = get(id)
       s.gamesPlayed++
@@ -65,13 +66,13 @@ export function computePlayerStats(
     }
     for (const { hand, outcome } of replayHands(handsByGame[game.id] ?? [])) {
       const s = get(hand.bidderId)
+      // A Moon is a bid too: it counts toward bids, bids made and the average (as 120).
+      s.bids++
+      s.bidSum += hand.bid === 'moon' ? 120 : hand.bid
+      if (outcome.made) s.bidsMade++
       if (hand.bid === 'moon') {
         s.moonsAttempted++
         if (outcome.made) s.moonsMade++
-      } else {
-        s.bids++
-        s.bidSum += hand.bid
-        if (outcome.made) s.bidsMade++
       }
       if (hand.rookHolderId && hand.rookHolderId !== ROOK_IN_KITTY) get(hand.rookHolderId).rookHeld++
     }

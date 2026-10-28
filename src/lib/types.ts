@@ -44,6 +44,8 @@ export interface Game {
   /** Player ids in clockwise seat order; must alternate teams. */
   seatOrder: string[]
   firstDealerId: string
+  /** Players swapped out mid-game: old id → the id that took their seat. Earlier hands keep the old id. */
+  subs?: Record<string, string>
   status: GameStatus
   mode?: GameMode
   winner?: TeamId | null

@@ -14,7 +14,7 @@ import type { Player, TeamId } from '../../lib/types'
 import type { SeatInfo } from '../components/Table'
 import { TableView, type Finished } from '../components/TableView'
 import { scorekeeperHandNumber, useHostDuties } from '../match/host'
-import { claimHost, claimSeat, commitMove, dealNextHand, mySeats, releaseSeat, seatBots, seatsFilled, setMatchStatus } from '../match/moves'
+import { claimHost, claimSeat, commitMove, dealNextHand, leaveOtherTables, mySeats, releaseSeat, seatBots, seatsFilled, setMatchStatus } from '../match/moves'
 import { loadIdentity } from '../identity'
 import { autoTeamName } from '../../lib/seating'
 import { useHeartbeat, useWhoIsHere } from '../presence'
@@ -87,6 +87,14 @@ export function TablePage() {
     }
   }, [match, identity, me, matchStore])
   useHeartbeat(identity, match?.id ?? null)
+
+  // One table per phone: once seated here, any seat held at another open table is given up.
+  const [allMatches, setAllMatches] = useState<MatchDoc[]>([])
+  useEffect(() => matchStore.subscribeMatches(setAllMatches, () => undefined), [matchStore])
+  useEffect(() => {
+    if (!match || me === null) return
+    leaveOtherTables(matchStore, allMatches, match.id).catch(() => undefined)
+  }, [match, me, allMatches, matchStore])
 
   // If the host's phone goes quiet, the first seated phone to notice takes over hosting.
   const { all: presenceAll } = useWhoIsHere()

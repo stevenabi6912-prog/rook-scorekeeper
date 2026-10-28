@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { autoTeamName, interleave, moveItem, nextDealerId, nextSeat, validateSeating } from './seating'
+import { autoTeamName, interleave, moveItem, nextDealerId, nextSeat, swapPlayer, validateSeating } from './seating'
 import type { Hand } from './types'
 
 const teams4 = { A: { name: 'A', playerIds: ['a1', 'a2'] }, B: { name: 'B', playerIds: ['b1', 'b2'] } }
@@ -75,5 +75,31 @@ describe('moveItem', () => {
     expect(moveItem([1, 2, 3], 0, 1)).toEqual([2, 1, 3])
     expect(moveItem([1, 2, 3], 2, 1)).toEqual([1, 3, 2])
     expect(moveItem([1, 2, 3], 0, -1)).toEqual([1, 2, 3])
+  })
+})
+
+describe('swapping a player mid-game', () => {
+  const game = {
+    seatOrder: ['a1', 'b1', 'a2', 'b2'],
+    firstDealerId: 'a1',
+    teams: { A: { name: 'Ann & Al', playerIds: ['a1', 'a2'] }, B: { name: 'The Bees', playerIds: ['b1', 'b2'] } },
+  }
+  const names: Record<string, string> = { a1: 'Ann', a2: 'Al', b1: 'Bo', b2: 'Bea', c1: 'Cal' }
+  const nameOf = (id: string) => names[id]
+  it('puts the newcomer in the seat and keeps a custom team name', () => {
+    const g = swapPlayer(game, 'b1', 'c1', nameOf)
+    expect(g.seatOrder).toEqual(['a1', 'c1', 'a2', 'b2'])
+    expect(g.teams.B).toEqual({ name: 'The Bees', playerIds: ['c1', 'b2'] })
+    expect(g.subs).toEqual({ b1: 'c1' })
+  })
+  it('renames an automatic team name', () => {
+    const g = swapPlayer(game, 'a2', 'c1', nameOf)
+    expect(g.teams.A.name).toBe('Ann & Cal')
+  })
+  it('keeps the deal rotating when the last dealer was swapped out', () => {
+    const g = { ...game, ...swapPlayer(game, 'b1', 'c1', nameOf) }
+    const hand = { dealerId: 'b1' } as Hand
+    expect(nextDealerId(g, [hand])).toBe('a2')
+    expect(nextDealerId(g, [{ dealerId: 'a1' } as Hand])).toBe('c1')
   })
 })

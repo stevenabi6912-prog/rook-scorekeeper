@@ -14,6 +14,7 @@ import { loadIdentity, saveIdentity } from '../identity'
 import { startTable, type Participant } from '../match/lobby'
 import type { MatchDoc } from '../match/types'
 import { useHeartbeat, useWhoIsHere } from '../presence'
+import { isIdle, useIdleSweep } from '../sweep'
 import '../play.css'
 
 /*
@@ -49,7 +50,8 @@ export function PlayLobbyPage() {
   useHeartbeat(validIdentity, null)
   const { here } = useWhoIsHere()
 
-  const open = useMemo(() => (matches ?? []).filter((m) => m.status === 'seating' || m.status === 'playing'), [matches])
+  const open = useMemo(() => (matches ?? []).filter((m) => (m.status === 'seating' || m.status === 'playing') && !isIdle(m, now)), [matches, now])
+  useIdleSweep(matches)
   const gameById = useMemo(() => new Map((games ?? []).map((g) => [g.id, g])), [games])
   const people = useMemo(() => (players ?? []).filter((p) => !p.archived && !p.bot), [players])
   // Plans stay listed until three hours after their time; this phone's own old ones are tidied away.

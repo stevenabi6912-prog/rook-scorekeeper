@@ -27,12 +27,13 @@ describe('computePlayerStats', () => {
     expect(stats.b1.wins).toBe(0)
     expect(stats.b1.gamesPlayed).toBe(1)
   })
-  it('bid success and average exclude moons', () => {
+  it('bid success and average count a Moon as a 120 bid', () => {
     expect(stats.a1.bids).toBe(2)
     expect(stats.a1.bidsMade).toBe(1)
     expect(stats.a1.averageBid).toBe(90)
-    expect(stats.b1.bids).toBe(0)
-    expect(stats.b1.averageBid).toBeNull()
+    expect(stats.b1.bids).toBe(2)
+    expect(stats.b1.bidsMade).toBe(1)
+    expect(stats.b1.averageBid).toBe(120)
     expect(stats.a2.averageBid).toBe(120)
   })
   it('counts moons attempted and made', () => {

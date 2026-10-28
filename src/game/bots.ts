@@ -173,6 +173,8 @@ export function botTricks(state: HandState, seat: number, trumpSuit: Suit = botT
  * bid is about 80 and bids are made four times in five. The old 12 a trick
  * left six-handed bots passing nine hands in ten.
  */
+/** How much stronger than a partner's call a hand must rate itself before bidding over them. */
+const PARTNER_RAISE_MARGIN = 15
 const BID_PER_TRICK = 18
 const BID_EXTRA_PARTNER = 20
 
@@ -213,6 +215,11 @@ export function botBid(state: HandState, seat: number, rng: Rng): BidAction {
   const lowestBid = numbers[0]
   if (lowestBid === undefined) return options.includes('pass') ? 'pass' : options[0]
   if (lowestBid > max) return options.includes('pass') ? 'pass' : lowestBid
+  // Partner has the bid: leave it with them unless this hand is clearly stronger than their call.
+  const high = state.bidding.highBid
+  const highSeat = state.bidding.highSeat
+  const partnerHigh = highSeat !== null && highSeat !== seat && state.teams[highSeat] === state.teams[seat]
+  if (partnerHigh && options.includes('pass') && (high === 'moon' || max < (high as number) + PARTNER_RAISE_MARGIN)) return 'pass'
   // Usually the minimum; now and then a small jump to shake people off.
   const jump = rng() < 0.2 ? 5 : 0
   const choice = Math.min(lowestBid + jump, max)

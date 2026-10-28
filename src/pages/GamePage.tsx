@@ -9,7 +9,8 @@ import { useMatchStore, useStore } from '../data/StoreContext'
 import type { MatchDoc } from '../play/match/types'
 import { useGame, useHands, usePlayers } from '../hooks/useData'
 import { leadingTeam, replayHands, teamsAtTarget } from '../lib/scoring'
-import { nextDealerId } from '../lib/seating'
+import { nextDealerId, swapPlayer } from '../lib/seating'
+import { Avatar } from '../components/Avatar'
 import { RULES, trumpInfo, type TeamId } from '../lib/types'
 
 export function GamePage() {
@@ -18,7 +19,7 @@ export function GamePage() {
   const store = useStore()
   const { game, loading: gameLoading, error: gameError } = useGame(gameId)
   const { hands, loading: handsLoading } = useHands(gameId)
-  const { byId } = usePlayers()
+  const { byId, players } = usePlayers()
   const liveTable = useLiveTable(gameId)
 
   const scored = useMemo(() => replayHands(hands ?? []), [hands])
@@ -32,6 +33,10 @@ export function GamePage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [names, setNames] = useState<Record<TeamId, string>>({ A: '', B: '' })
   const [overrideOpen, setOverrideOpen] = useState(false)
+  // Swapping a player out mid-game: who is leaving, who is sitting down.
+  const [swapOpen, setSwapOpen] = useState(false)
+  const [swapOut, setSwapOut] = useState<string | null>(null)
+  const [swapIn, setSwapIn] = useState<string | null>(null)
 
   if (gameError) return <><TopBar title="Game" back="/" /><main className="page no-nav"><div className="error">{gameError}</div></main></>
   if (gameLoading || handsLoading || !hands) return <><TopBar title="Game" back="/" /><main className="page no-nav"><div className="spinner" /></main></>
@@ -53,6 +58,15 @@ export function GamePage() {
     await store.updateGame(game.id, { status: 'finished', winner, finishedAt: Date.now() })
   }
   const reopen = () => store.updateGame(game.id, { status: 'active', winner: null })
+  const seated = new Set(game.seatOrder)
+  const bench = (players ?? []).filter((p) => !p.archived && !p.bot && !seated.has(p.id))
+  const doSwap = async () => {
+    if (!swapOut || !swapIn) return
+    setSwapOpen(false)
+    await store.updateGame(game.id, swapPlayer(game, swapOut, swapIn, (id) => byId.get(id)?.name ?? '?'))
+    setSwapOut(null)
+    setSwapIn(null)
+  }
   // Same teams and seats; the deal carries on from where this game left off.
   const playAgain = async () => {
     const id = await store.createGame({
@@ -178,6 +192,9 @@ export function GamePage() {
         <div className="dialog-backdrop" onClick={() => setMenuOpen(false)} role="presentation">
           <div className="dialog stack" onClick={(e) => e.stopPropagation()}>
             <button className="btn block" onClick={() => { setMenuOpen(false); setNames({ A: game.teams.A.name, B: game.teams.B.name }); setRenameOpen(true) }}>Rename teams</button>
+            {isActive && game.mode !== 'online' && (
+              <button className="btn block" onClick={() => { setMenuOpen(false); setSwapOpen(true) }}>Swap a player</button>
+            )}
             {isActive ? (
               <button className="btn block" onClick={() => { setMenuOpen(false); openFinish() }}>Finish game now</button>
             ) : (
@@ -188,6 +205,35 @@ export function GamePage() {
           </div>
         </div>
       )}
+
+      <Dialog
+        open={swapOpen}
+        title="Swap a player"
+        confirmLabel="Swap"
+        confirmDisabled={!swapOut || !swapIn}
+        onCancel={() => setSwapOpen(false)}
+        onConfirm={doSwap}
+      >
+        <p className="muted small">Who is getting up? Their seat, team and place in the deal go to whoever sits down. Hands already scored stay as they were.</p>
+        <div className="chips" style={{ marginBottom: 10 }}>
+          {game.seatOrder.map((id) => (
+            <button key={id} type="button" className={`chip team-${game.teams.A.playerIds.includes(id) ? 'A' : 'B'}${swapOut === id ? ' selected' : ''}`} onClick={() => setSwapOut(id)}>
+              {byId.get(id)?.name ?? '?'}
+            </button>
+          ))}
+        </div>
+        <p className="muted small">Who is sitting down?</p>
+        {bench.length === 0 && <p className="small">Everyone on the Players tab is already in this game. Add the new person on the Players tab first.</p>}
+        <div className="list">
+          {bench.map((p) => (
+            <button key={p.id} type="button" className="seat" onClick={() => setSwapIn(p.id)} style={{ textAlign: 'left', border: 'none', borderLeft: `5px solid ${swapIn === p.id ? 'var(--primary)' : 'var(--border)'}` }}>
+              <Avatar player={p} />
+              <div className="grow" style={{ fontWeight: swapIn === p.id ? 700 : 500 }}>{p.name}</div>
+              {swapIn === p.id && <span className="badge good">sitting down</span>}
+            </button>
+          ))}
+        </div>
+      </Dialog>
 
       <Dialog
         open={renameOpen}
