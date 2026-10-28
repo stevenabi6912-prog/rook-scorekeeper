@@ -127,6 +127,19 @@ export async function setMatchStatus(store: MatchStore, matchId: string, status:
 /** A table with no action for this long is closed by whichever phone notices. */
 export const IDLE_TABLE_MS = 5 * 60_000
 
+/**
+ * Keep a table alive: a write that changes nothing but updatedAt. Phones sitting
+ * at a table do this while it waits for players or for the host to deal, so the
+ * idle sweep does not close a table people are still at.
+ */
+export async function touchTable(store: MatchStore, matchId: string): Promise<void> {
+  await store.transact(matchId, async (tx) => {
+    const match = await tx.getMatch()
+    if (match.status !== 'seating' && match.status !== 'playing') return
+    tx.setMatch({})
+  })
+}
+
 /** Close an idle table (any phone may; the rules check the idle time too). */
 export async function abandonIdle(store: MatchStore, matchId: string): Promise<void> {
   await store.transact(matchId, async (tx) => {

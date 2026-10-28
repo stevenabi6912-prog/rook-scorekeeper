@@ -18,6 +18,7 @@ import { claimHost, claimSeat, commitMove, dealNextHand, leaveOtherTables, mySea
 import { loadIdentity } from '../identity'
 import { autoTeamName } from '../../lib/seating'
 import { useHeartbeat, useWhoIsHere } from '../presence'
+import { useKeepAlive } from '../sweep'
 import { useWakeLock } from '../wakeLock'
 import { PRESENCE_STALE_MS } from '../match/types'
 import type { MatchDoc } from '../match/types'
@@ -132,6 +133,8 @@ export function TablePage() {
     seatNames,
     teamNames: hostTeamNames,
   })
+  // A table people are sitting at is never idle, however long they wait for the others.
+  useKeepAlive(match, me !== null || isHost)
 
   const seats: SeatInfo[] = useMemo(
     () =>
@@ -148,11 +151,11 @@ export function TablePage() {
   }, [game, seats])
 
   if (error) return <Gate title="Table"><div className="error">{error}</div></Gate>
-  if (match === undefined || !game) return <Gate title="Table"><div className="spinner" /></Gate>
-  if (match === null) {
+  if (match === undefined || game === undefined) return <Gate title="Table"><div className="spinner" /></Gate>
+  if (match === null || game === null) {
     return (
       <Gate title="Table">
-        <div className="empty">This table is gone.</div>
+        <div className="empty">{match === null ? 'This table is gone.' : 'The game for this table is gone. Start a new table.'}</div>
         <Link className="btn block" to="/play">Back to Play</Link>
       </Gate>
     )

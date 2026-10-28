@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import { useMatchStore, useStore } from '../data/StoreContext'
 import { useGames } from '../hooks/useData'
 import { leadingTeam, replayHands } from '../lib/scoring'
-import { IDLE_TABLE_MS, abandonIdle } from './match/moves'
+import type { Game } from '../lib/types'
+import { IDLE_TABLE_MS, abandonIdle, touchTable } from './match/moves'
 import type { MatchDoc } from './match/types'
 
 /*
@@ -14,6 +15,49 @@ import type { MatchDoc } from './match/types'
 
 export function isIdle(m: MatchDoc, now = Date.now()): boolean {
   return (m.status === 'seating' || m.status === 'playing') && now > m.updatedAt + IDLE_TABLE_MS
+}
+
+/**
+ * Phones at a table touch it once it has gone this long without a write, so a
+ * table waiting for players (or for the host to deal) is not taken for idle.
+ */
+export const KEEP_ALIVE_AFTER_MS = IDLE_TABLE_MS / 2
+
+export function needsTouch(m: MatchDoc, now = Date.now()): boolean {
+  return (m.status === 'seating' || m.status === 'playing') && now >= m.updatedAt + KEEP_ALIVE_AFTER_MS
+}
+
+/** While `here` (seated at, or hosting, this table), keep it from going idle. */
+export function useKeepAlive(match: MatchDoc | null | undefined, here: boolean) {
+  const store = useMatchStore()
+  const id = match?.id
+  const status = match?.status
+  const updatedAt = match?.updatedAt ?? 0
+  useEffect(() => {
+    if (!id || !here || (status !== 'seating' && status !== 'playing')) return
+    const touch = () => {
+      if (document.visibilityState === 'hidden') return
+      if (Date.now() >= updatedAt + KEEP_ALIVE_AFTER_MS) touchTable(store, id).catch(() => undefined)
+    }
+    touch()
+    const t = setInterval(touch, 30_000)
+    document.addEventListener('visibilitychange', touch)
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', touch)
+    }
+  }, [store, id, status, updatedAt, here])
+}
+
+/**
+ * An online game to finish or delete: its table is gone, closed or idle. A game
+ * is written a moment before its table, and a phone in the lobby may see the
+ * one before the other, so a game younger than the idle limit is left alone.
+ */
+export function orphanedOnlineGame(g: Game, table: MatchDoc | undefined, now = Date.now()): boolean {
+  if (g.mode !== 'online' || g.status !== 'active') return false
+  if (now < g.createdAt + IDLE_TABLE_MS) return false
+  return !table || table.status === 'abandoned' || table.status === 'finished' || isIdle(table, now)
 }
 
 export function useIdleSweep(matches: MatchDoc[] | null) {
@@ -33,10 +77,7 @@ export function useIdleSweep(matches: MatchDoc[] | null) {
       }
       const byGame = new Map(matches.map((m) => [m.gameId, m]))
       for (const g of games) {
-        if (g.mode !== 'online' || g.status !== 'active' || busy.current.has(g.id)) continue
-        const table = byGame.get(g.id)
-        const tableGone = !table || table.status === 'abandoned' || table.status === 'finished' || isIdle(table, now)
-        if (!tableGone) continue
+        if (busy.current.has(g.id) || !orphanedOnlineGame(g, byGame.get(g.id), now)) continue
         busy.current.add(g.id)
         try {
           const hands = await dataStore.getHands(g.id)
