@@ -47,9 +47,10 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
 
   const [dealerId, setDealerId] = useState(editing?.dealerId ?? nextDealerId(game, priorHands))
   const [showDealerPicker, setShowDealerPicker] = useState(false)
-  const [bidderId, setBidderId] = useState<string>(editing?.bidderId ?? '')
-  const [bid, setBid] = useState<Bid | null>(editing?.bid ?? null)
-  const [points, setPoints] = useState<number>(editing?.pointsTaken ?? 0)
+  // New hands start with whatever was set on the live screen: who has the bid, for how much, and the trump.
+  const [bidderId, setBidderId] = useState<string>(editing?.bidderId ?? game.currentBid?.bidderId ?? '')
+  const [bid, setBid] = useState<Bid | null>(editing?.bid ?? game.currentBid?.bid ?? null)
+  const [points, setPoints] = useState<number>(editing?.pointsTaken ?? (typeof game.currentBid?.bid === 'number' ? game.currentBid.bid : 0))
   const [pointsTouched, setPointsTouched] = useState(!!editing)
   const [moonMade, setMoonMade] = useState<boolean | null>(editing?.bid === 'moon' ? (editing.moonMade ?? null) : null)
   const [rookHolderId, setRookHolderId] = useState<string | null>(editing?.rookHolderId ?? null)
@@ -78,6 +79,17 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
   const step = (d: number) => {
     setPointsTouched(true)
     setPoints((p) => Math.max(0, Math.min(maxPoints, p + d)))
+  }
+  // A missed Moon is entered as the points the other team took (that is what people count);
+  // the hand still stores what the shooters took.
+  const missedMoon = isMoon && moonMade === false
+  const shown = missedMoon ? RULES.TOTAL_POINTS - points : points
+  const shownMin = missedMoon ? RULES.TOTAL_POINTS - maxPoints : 0
+  const shownMax = missedMoon ? RULES.TOTAL_POINTS : maxPoints
+  const setShown = (v: number) => {
+    setPointsTouched(true)
+    const clamped = Math.max(shownMin, Math.min(shownMax, Math.round(v / RULES.POINT_STEP) * RULES.POINT_STEP))
+    setPoints(missedMoon ? RULES.TOTAL_POINTS - clamped : clamped)
   }
 
   const effectivePoints = isMoon && moonMade ? RULES.TOTAL_POINTS : points
@@ -194,27 +206,25 @@ function HandForm({ game, hands, byId, editing }: { game: Game; hands: Hand[]; b
 
         {bid !== null && !(isMoon && moonMade !== false) && (
           <section className="section">
-            <h3>{isMoon ? 'Points the shooters took before missing' : `Points ${bidTeam ? game.teams[bidTeam].name : 'bidding team'} took`}</h3>
+            <h3>{missedMoon ? `Points ${bidTeam ? game.teams[otherTeam(bidTeam)].name : 'the other team'} took` : `Points ${bidTeam ? game.teams[bidTeam].name : 'bidding team'} took`}</h3>
             <div className="stepper">
-              <button onClick={() => step(-RULES.POINT_STEP)} disabled={points <= 0} aria-label="Minus 5">−</button>
+              <button onClick={() => (missedMoon ? setShown(shown - RULES.POINT_STEP) : step(-RULES.POINT_STEP))} disabled={shown <= shownMin} aria-label="Minus 5">−</button>
               <input
                 type="number"
                 inputMode="numeric"
-                min={0}
-                max={maxPoints}
+                min={shownMin}
+                max={shownMax}
                 step={RULES.POINT_STEP}
-                value={points}
-                onChange={(e) => {
-                  setPointsTouched(true)
-                  setPoints(Number(e.target.value))
-                }}
-                onBlur={() => setPoints((p) => Math.max(0, Math.min(maxPoints, Math.round(p / RULES.POINT_STEP) * RULES.POINT_STEP)))}
+                value={shown}
+                onChange={(e) => (missedMoon ? setShown(Number(e.target.value)) : (setPointsTouched(true), setPoints(Number(e.target.value))))}
+                onBlur={() => (missedMoon ? setShown(shown) : setPoints((p) => Math.max(0, Math.min(maxPoints, Math.round(p / RULES.POINT_STEP) * RULES.POINT_STEP))))}
                 aria-label="Points taken"
               />
-              <button onClick={() => step(RULES.POINT_STEP)} disabled={points >= maxPoints} aria-label="Plus 5">+</button>
+              <button onClick={() => (missedMoon ? setShown(shown + RULES.POINT_STEP) : step(RULES.POINT_STEP))} disabled={shown >= shownMax} aria-label="Plus 5">+</button>
             </div>
-            {!pointsOk && <div className="error" style={{ marginTop: 8 }}>Enter 0–{maxPoints} in steps of 5.</div>}
+            {!pointsOk && <div className="error" style={{ marginTop: 8 }}>Enter {shownMin}–{shownMax} in steps of 5.</div>}
             {bidTeam && !isMoon && <p className="muted small" style={{ marginTop: 6 }}>{game.teams[otherTeam(bidTeam)].name} took {RULES.TOTAL_POINTS - Math.min(RULES.TOTAL_POINTS, Math.max(0, points))}.</p>}
+            {missedMoon && bidTeam && <p className="muted small" style={{ marginTop: 6 }}>{game.teams[bidTeam].name} took {points} before missing.</p>}
           </section>
         )}
 

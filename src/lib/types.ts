@@ -52,6 +52,8 @@ export interface Game {
   /** Trump for the hand being played right now, set from the live screen so
    *  every phone shows it. Cleared when that hand is saved. */
   currentTrump?: Trump | null
+  /** The bid on the table right now, set from the live screen like the trump; cleared when the hand is saved. */
+  currentBid?: { bidderId: string; bid: Bid } | null
   createdAt: number
   finishedAt?: number
 }

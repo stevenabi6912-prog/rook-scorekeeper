@@ -199,18 +199,20 @@ export function botMaxBid(state: HandState, seat: number): number {
   return Math.max(0, Math.min(rules.maxBid, max))
 }
 
+/** Only a hand that should take every trick shoots (or overshoots) the Moon: the Rook, nearly all trump, and the tricks to show for it. */
+export function canRunTheTable(state: HandState, seat: number): boolean {
+  const hand = state.hands[seat]
+  const trumpSuit = botTrump(state, seat)
+  const trumps = bySuit(hand)[trumpSuit].length + (hand.includes(ROOK) ? 1 : 0)
+  return hand.includes(ROOK) && trumps >= state.handSize - 1 && botTricks(state, seat) >= state.handSize - 0.5
+}
+
 export function botBid(state: HandState, seat: number, rng: Rng): BidAction {
   const options = legalBids(state, seat)
   if (options.length === 0) throw new Error('bot has no legal bid')
   const numbers = options.filter((o): o is number => typeof o === 'number')
-  const hand = state.hands[seat]
-  const trumpSuit = botTrump(state, seat)
-  const groups = bySuit(hand)
-  const trumps = [...groups[trumpSuit], ...(hand.includes(ROOK) ? [ROOK] : [])]
   // A hand that can run the table shoots for the Moon.
-  if (options.includes('moon') && hand.includes(ROOK) && trumps.length >= 8 && botTricks(state, seat) >= state.handSize - 0.5) {
-    return 'moon'
-  }
+  if (options.includes('moon') && canRunTheTable(state, seat)) return 'moon'
   const max = botMaxBid(state, seat)
   const lowestBid = numbers[0]
   if (lowestBid === undefined) return options.includes('pass') ? 'pass' : options[0]
@@ -447,7 +449,8 @@ export function botDecision(state: HandState, seat: number, rng: Rng, opts: { ov
     case 'bidding':
       return { type: 'bid', seat, bid: botBid(state, seat, rng) }
     case 'overshoot':
-      return { type: 'overshoot', seat, accept: opts.overshootAccept ?? rng() < 0.15 }
+      // The dealer may overshoot a Moon; a bot only does it with a hand that can run the table.
+      return { type: 'overshoot', seat, accept: opts.overshootAccept ?? canRunTheTable(state, seat) }
     case 'nest':
       return state.nestPickedUp === 0 ? { type: 'pickup', seat } : { type: 'discard', seat, cards: botDiscard(state, seat) }
     case 'trump':

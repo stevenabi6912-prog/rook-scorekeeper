@@ -11,7 +11,8 @@ import { useGame, useHands, usePlayers } from '../hooks/useData'
 import { leadingTeam, replayHands, teamsAtTarget } from '../lib/scoring'
 import { nextDealerId, swapPlayer } from '../lib/seating'
 import { Avatar } from '../components/Avatar'
-import { RULES, trumpInfo, type TeamId } from '../lib/types'
+import { RULES, trumpInfo, type Bid, type TeamId } from '../lib/types'
+import { BID_OPTIONS } from '../lib/scoring'
 
 export function GamePage() {
   const { gameId } = useParams()
@@ -130,10 +131,31 @@ export function GamePage() {
               <div className="row">
                 <TrumpDot trump={game.currentTrump} size="lg" />
                 <div>
-                  <div className="label">Trump this hand</div>
-                  <div className="name">{trumpInfo(game.currentTrump)?.label ?? 'Not set yet'}</div>
+                  <div className="label">Hand {scored.length + 1} in progress</div>
+                  <div className="name">
+                    {game.currentBid ? `${byId.get(game.currentBid.bidderId)?.name ?? '?'} has it for ${game.currentBid.bid === 'moon' ? 'the Moon' : game.currentBid.bid}` : 'No bid yet'}
+                    {' · '}
+                    {trumpInfo(game.currentTrump)?.label ? `${trumpInfo(game.currentTrump)?.label} trump` : 'trump not set'}
+                  </div>
                 </div>
               </div>
+              <div className="muted small" style={{ margin: '8px 0 4px' }}>Who has the bid</div>
+              <div className="chips">
+                {game.seatOrder.map((id) => (
+                  <button key={id} type="button" className={`chip${game.currentBid?.bidderId === id ? ' selected' : ''}`} onClick={() => store.updateGame(game.id, { currentBid: { bidderId: id, bid: game.currentBid?.bid ?? RULES.MIN_BID } })}>
+                    {byId.get(id)?.name ?? '?'}
+                  </button>
+                ))}
+              </div>
+              <div className="muted small" style={{ margin: '8px 0 4px' }}>For how much</div>
+              <div className="chips">
+                {([...BID_OPTIONS, 'moon'] as Bid[]).map((b) => (
+                  <button key={String(b)} type="button" className={`chip${game.currentBid?.bid === b ? ' selected' : ''}`} disabled={!game.currentBid} onClick={() => game.currentBid && store.updateGame(game.id, { currentBid: { bidderId: game.currentBid.bidderId, bid: b } })}>
+                    {b === 'moon' ? '🌙' : b}
+                  </button>
+                ))}
+              </div>
+              <div className="muted small" style={{ margin: '8px 0 4px' }}>Trump</div>
               <TrumpPicker value={game.currentTrump} onChange={(t) => store.updateGame(game.id, { currentTrump: t })} />
             </div>
           </>
