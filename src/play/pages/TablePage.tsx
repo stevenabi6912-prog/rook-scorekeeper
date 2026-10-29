@@ -23,7 +23,6 @@ import { useWakeLock } from '../wakeLock'
 import { PRESENCE_STALE_MS } from '../match/types'
 import type { MatchDoc } from '../match/types'
 import { toState } from '../match/view'
-import { describeAction } from '../match/events'
 import type { ChatMessage } from '../match/types'
 import type { ChatApi } from '../components/ChatPanel'
 import { joinNames, TURN_LIMIT_MS } from './DemoTablePage'
@@ -109,18 +108,6 @@ export function TablePage() {
     return () => clearTimeout(t)
   }, [match, me, matchStore, presenceAll])
 
-  const seatNames = useMemo(() => (match?.seats ?? []).map((s) => byId.get(s.playerId)?.name ?? 'Player'), [match, byId])
-  // Stable callbacks and objects, so the host's timers are not restarted by unrelated re-renders.
-  const onEvent = useCallback(
-    (seat: number | null, text: string) => {
-      matchStore.sendMessage(matchId, { uid: matchStore.uid, seat, kind: 'event', text }).catch(() => undefined)
-    },
-    [matchStore, matchId],
-  )
-  const hostTeamNames = useMemo<Record<TeamId, string>>(
-    () => (game ? { A: game.teams.A.name, B: game.teams.B.name } : { A: 'Team A', B: 'Team B' }),
-    [game],
-  )
   const { isHost } = useHostDuties({
     matchStore,
     dataStore,
@@ -129,9 +116,6 @@ export function TablePage() {
     hands,
     rng,
     turnLimitMs: TURN_LIMIT_MS,
-    onEvent,
-    seatNames,
-    teamNames: hostTeamNames,
   })
   // A table people are sitting at is never idle, however long they wait for the others.
   useKeepAlive(match, me !== null || isHost)
@@ -399,12 +383,9 @@ function LiveTable({
 
   const act = useCallback(
     async (action: Action) => {
-      const before = toState(match.pub!, me, cards ?? [])
       await commitMove(matchStore, match.id, me, () => action)
-      const line = describeAction(before, action, seats.map((s) => s.name))
-      if (line) matchStore.sendMessage(match.id, { uid: matchStore.uid, seat: me, kind: 'event', text: line }).catch(() => undefined)
     },
-    [matchStore, match.id, me, match.pub, cards, seats],
+    [matchStore, match.id, me],
   )
 
   const [seatsOpen, setSeatsOpen] = useState(false)

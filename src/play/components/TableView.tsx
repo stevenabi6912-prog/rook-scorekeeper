@@ -9,6 +9,7 @@ import { tallies, type HandResult } from '../../game/score'
 import type { HandOutcome, Scores } from '../../lib/scoring'
 import type { TeamId } from '../../lib/types'
 import { audioResume, isMuted, setMuted, sounds, unlockAudio } from '../sound'
+import { BAR_FELT, useStatusBarColor } from '../../lib/theme'
 import { HandFan } from './Hand'
 import { BidPanel, HandSummary, KittyPanel, OvershootPanel, TrumpChip, TrumpPanel } from './Panels'
 import { SeatAvatar, SeatBadge, Table, type SeatInfo, type Sweep } from './Table'
@@ -88,6 +89,8 @@ export function TableView(props: TableViewProps) {
   const [selected, setSelected] = useState<CardId[]>([])
   const [sweep, setSweep] = useState<Sweep | null>(null)
   const [muted, setMutedState] = useState(isMuted())
+  // The status bar matches the table's own top bar while the table is open.
+  useStatusBarColor(BAR_FELT)
   const [toast, setToast] = useState<string | null>(null)
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const seenTricks = useRef(state.tricks.length)

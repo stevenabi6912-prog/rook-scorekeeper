@@ -56,11 +56,10 @@ function ScoreCell({ team, bidTeam, outcome }: { team: TeamId; bidTeam: TeamId; 
   return (
     <td className={`score-col team-${team}`}>
       <span className="line running">{outcome.totals[team]}</span>
-      {isMoonShooter ? (
-        <span className="line delta set">set to {outcome.setTo}</span>
-      ) : (
-        <span className={`line delta ${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}`}>{d > 0 ? `+${d}` : d}</span>
-      )}
+      {/* A Moon jumps the bidders to the next 500 either way; the signed jump fits the column where "set to 500" did not. */}
+      <span className={`line delta ${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}${isMoonShooter ? ' moon' : ''}`} title={isMoonShooter ? `Moon: set to ${outcome.setTo}` : undefined}>
+        {d > 0 ? `+${d}` : d}
+      </span>
     </td>
   )
 }

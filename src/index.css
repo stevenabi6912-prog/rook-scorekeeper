@@ -79,9 +79,13 @@
 
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; }
+/* The canvas carries the top bar's colour: an iOS 26 home-screen app paints its opaque
+   status bar from the page's own background, so the two read as one bar. The page itself
+   is painted on #root. A screen with a different bar (the card table) overrides this. */
+html { background: var(--bar-bg); }
+#root { background: var(--bg); }
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
@@ -255,7 +259,7 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .hand-table .delta { font-size: 0.85rem; }
 .hand-table .delta.pos { color: var(--good); }
 .hand-table .delta.neg { color: var(--bad); }
-.hand-table .delta.set { color: var(--accent); font-weight: 700; }
+.hand-table .delta.moon { font-weight: 700; }
 .hand-table .running { font-weight: 700; font-size: 1rem; }
 .hand-table .line { display: block; }
 .hand-table .line.small { color: var(--muted); font-size: 0.78rem; }

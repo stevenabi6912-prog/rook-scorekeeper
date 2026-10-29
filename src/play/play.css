@@ -3,6 +3,7 @@
 :root {
   --felt: #1f6b3f;
   --felt-deep: #0f4527;
+  --felt-bar: #0b3a21; /* the table's top bar; keep in step with BAR_FELT in lib/theme.ts */
   --felt-edge: #3a2416;
   --felt-text: #f2f7f3;
   --felt-muted: rgba(242, 247, 243, 0.7);
@@ -43,11 +44,14 @@
   position: relative; z-index: 80; /* stays reachable above the hand summary */
   display: flex; align-items: center; gap: 8px;
   padding: calc(env(safe-area-inset-top) + 6px) 10px 6px;
-  background: rgba(0, 0, 0, 0.22); backdrop-filter: blur(6px);
+  /* A solid band, the same colour the phone's status bar is given while the table is open,
+     so the two read as one bar. */
+  background: var(--felt-bar);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 .table-top .icon-btn.light { color: var(--felt-text); }
 .table-title { flex: 1; min-width: 0; line-height: 1.15; white-space: nowrap; }
-.table-title .hand-no { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--felt-muted); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.table-title .hand-no { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.85); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .table-title .scores { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .scores .score-sep { margin: 0 6px; color: var(--felt-muted); }
 .score.team-A { color: #9ec5ff; }
@@ -292,10 +296,10 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 @keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
-.chat-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 4px 16px; }
-.chat-list { flex: 1; overflow-y: auto; padding: 4px 12px; display: flex; flex-direction: column; gap: 8px; min-height: 160px; }
+/* Only the message list shrinks and scrolls; the header, reactions and composer keep their height. */
+.chat-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 4px 16px; }
+.chat-list { flex: 1; overflow-y: auto; padding: 4px 12px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
 .chat-empty { color: var(--muted); text-align: center; padding: 24px 0; }
-.chat-event { text-align: center; font-size: 0.74rem; color: var(--muted); padding: 2px 0; }
 .chat-line { display: flex; gap: 8px; align-items: flex-start; }
 .chat-line.mine { flex-direction: row-reverse; text-align: right; }
 .chat-line .seat-avatar { width: 26px; height: 26px; font-size: 0.9rem; flex: none; }
@@ -306,10 +310,10 @@
 .chat-text { background: var(--surface-2); padding: 7px 10px; border-radius: 12px; display: inline-block; word-break: break-word; }
 .chat-line.mine .chat-text { background: var(--team-a-bg); }
 .chat-text.reaction { font-size: 1.6rem; padding: 2px 6px; background: transparent; }
-.chat-error { color: var(--bad); font-size: 0.8rem; padding: 0 16px; }
-.chat-reactions { display: flex; gap: 6px; padding: 6px 12px 0; overflow-x: auto; }
-.chat-reaction { min-width: 44px; height: 40px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); font-size: 1.3rem; }
-.chat-compose { display: flex; gap: 8px; padding: 8px 12px 10px; }
+.chat-error { flex: none; color: var(--bad); font-size: 0.8rem; padding: 0 16px; }
+.chat-reactions { flex: none; display: flex; gap: 6px; padding: 6px 12px 0; justify-content: center; }
+.chat-reaction { flex: 1 1 0; min-width: 0; max-width: 72px; height: 42px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); font-size: 1.3rem; }
+.chat-compose { flex: none; display: flex; gap: 8px; padding: 8px 12px 10px; }
 .chat-input { flex: 1; min-height: 42px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); padding: 0 12px; }
 .btn.mic { min-width: 92px; user-select: none; -webkit-user-select: none; touch-action: none; }
 .btn.mic.recording { background: #c62828; color: #fff; border-color: #c62828; animation: pulse-red 0.8s ease-in-out infinite; }

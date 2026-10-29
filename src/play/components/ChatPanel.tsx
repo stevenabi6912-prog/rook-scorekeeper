@@ -4,8 +4,8 @@ import { SeatAvatar, type SeatInfo } from './Table'
 
 /*
  * Table chat: a bottom sheet with the conversation, quick reactions, a text
- * box and a hold-to-talk voice button. Event lines (bids, trump, results)
- * sit in the same stream in a quieter style, so it doubles as the hand log.
+ * box and a hold-to-talk voice button. Only what players send is shown; the
+ * table itself never talks here (event lines left on older tables are skipped).
  */
 
 export interface ChatApi {
@@ -44,6 +44,7 @@ export function ChatPanel({ chat, seats, open, onClose }: { chat: ChatApi; seats
   )
 
   if (!open) return null
+  const lines = chat.messages.filter((m) => m.kind !== 'event')
   return (
     <div className="chat-backdrop" onClick={onClose}>
       <div className="chat-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Table chat">
@@ -52,9 +53,9 @@ export function ChatPanel({ chat, seats, open, onClose }: { chat: ChatApi; seats
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close chat">✕</button>
         </div>
         <div className="chat-list" ref={listRef}>
-          {chat.messages.length === 0 && <div className="chat-empty">Nothing yet. Say hi.</div>}
-          {chat.messages.map((m) => (
-            <ChatLine key={m.id} m={m} seats={seats} mine={m.uid === chat.myUid && m.seat === chat.mySeat && m.kind !== 'event'} />
+          {lines.length === 0 && <div className="chat-empty">Nothing yet. Say hi.</div>}
+          {lines.map((m) => (
+            <ChatLine key={m.id} m={m} seats={seats} mine={m.uid === chat.myUid && m.seat === chat.mySeat} />
           ))}
         </div>
         {error && <div className="chat-error">{error}</div>}
@@ -100,7 +101,6 @@ export function ChatPanel({ chat, seats, open, onClose }: { chat: ChatApi; seats
 }
 
 function ChatLine({ m, seats, mine }: { m: ChatMessage; seats: SeatInfo[]; mine: boolean }) {
-  if (m.kind === 'event') return <div className="chat-event">{m.text}</div>
   const info = m.seat !== null ? seats[m.seat] : undefined
   return (
     <div className={`chat-line${mine ? ' mine' : ''}`}>
